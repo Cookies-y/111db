@@ -258,6 +258,22 @@ You can also test endpoints using tools like Postman or `curl`.
         *   **Request Body (JSON):** `content` (string, required). (Title is ignored/auto-generated for replies).
         *   **Response (201 Created):** Newly created reply object.
 
+**Learning Progress (Simplified) Endpoints (JWT required for all, Student access):**
+
+*   **Material Progress Operations:**
+    *   **`POST /materials/<material_id>/progress`**: Student marks/unmarks progress for a specific material.
+        *   **Access:** Enrolled Student.
+        *   **Request Body (JSON):** `{"is_completed": true/false}`.
+        *   **Response (200 OK or 201 Created):** Updated/created progress details for that material.
+    *   **`GET /materials/<material_id>/progress`**: Student gets their progress for a specific material.
+        *   **Access:** Enrolled Student.
+        *   **Response (200 OK):** Progress details for that material (or default if no progress yet).
+
+*   **Course Progress Overview:**
+    *   **`GET /courses/<course_id>/my-material-progress`**: Student lists their completion status for all materials in a course.
+        *   **Access:** Enrolled Student.
+        *   **Response (200 OK):** List of material progress details for the specified course.
+
 *(Note: If a global API prefix like `/api` is configured in Flask-RESTx, these paths would be, for example, `/api/courses/<course_id>/assignments/`.)*
 
 ## Technology Stack
