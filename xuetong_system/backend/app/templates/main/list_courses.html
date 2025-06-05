@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+
+{% block title %}Courses - XueTong System{% endblock %}
+
+{% block content %}
+    <h1>Available Courses</h1>
+    {% if courses %}
+        <ul class="course-list">
+            {% for course in courses %}
+                <li class="course-list-item">
+                    <strong>{{ course.course_name }}</strong>
+                    {% if course.description %}
+                        <p>{{ course.description | safe }}</p>
+                    {% else %}
+                        <p><em>No description provided.</em></p>
+                    {% endif %}
+                    <div class="course-meta">
+                        <span>Taught by: {{ course.teacher.real_name if course.teacher else 'N/A' }} ({{course.teacher.username if course.teacher else 'Unknown'}})</span>
+                        <span>Created on: {{ course.create_time.strftime('%Y-%m-%d %H:%M') }}</span>
+                    </div>
+                </li>
+            {% endfor %}
+        </ul>
+    {% else %}
+        <p>No courses available at the moment.</p>
+    {% endif %}
+
+    {% if current_user.is_authenticated and current_user.user_type == 'teacher' %}
+        <p><a href="{{ url_for('main.create_course') }}" class="action-link">Create a New Course</a></p>
+    {% endif %}
+{% endblock %}

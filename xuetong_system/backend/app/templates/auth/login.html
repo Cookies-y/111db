@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+
+{% block title %}Login - XueTong System{% endblock %}
+
+{% block content %}
+    <h1>Login</h1>
+    {# Flash messages are now handled in base.html, so no need to repeat here unless specific placement is needed #}
+    {# However, it's fine to keep them if you want messages very close to the form #}
+    {# For this example, I'll remove the explicit flashed_messages block from here as base.html has it #}
+
+    <form method="POST" action="{{ url_for('auth.login') }}">
+        {{ form.csrf_token }}
+        <p>
+            {{ form.email.label }}<br>
+            {{ form.email(size=30) }}<br>
+            {% if form.email.errors %}
+                <ul class="errors">
+                {% for error in form.email.errors %}<li>{{ error }}</li>{% endfor %}
+                </ul>
+            {% endif %}
+        </p>
+        <p>
+            {{ form.password.label }}<br>
+            {{ form.password(size=30) }}<br>
+            {% if form.password.errors %}
+                <ul class="errors">
+                {% for error in form.password.errors %}<li>{{ error }}</li>{% endfor %}
+                </ul>
+            {% endif %}
+        </p>
+        <p>{{ form.submit() }}</p>
+    </form>
+    <p>New user? <a href="{{ url_for('auth.register') }}">Click to Register!</a></p>
+{% endblock %}

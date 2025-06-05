@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+
+{% block title %}Create Course - XueTong System{% endblock %}
+
+{% block content %}
+    <h1>Create New Course</h1>
+    {% if current_user.user_type == 'teacher' %}
+        <form method="POST" action="{{ url_for('main.create_course') }}">
+            {{ form.csrf_token }}
+            <p>
+                {{ form.course_name.label }}<br>
+                {{ form.course_name(size=50) }}<br>
+                {% if form.course_name.errors %}<ul class="errors">{% for error in form.course_name.errors %}<li>{{ error }}</li>{% endfor %}</ul>{% endif %}
+            </p>
+            <p>
+                {{ form.description.label }}<br>
+                {{ form.description(rows=5, cols=50) }}<br>
+                {% if form.description.errors %}<ul class="errors">{% for error in form.description.errors %}<li>{{ error }}</li>{% endfor %}</ul>{% endif %}
+            </p>
+            <p>{{ form.submit() }}</p>
+        </form>
+    {% else %}
+        <p>You are not authorized to create courses. Only teachers can create courses.</p>
+        <p><a href="{{ url_for('main.list_courses') }}">Back to course list</a></p>
+    {% endif %}
+{% endblock %}

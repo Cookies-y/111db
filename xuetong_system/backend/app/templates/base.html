@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}XueTong System{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <nav>
+        <a href="{{ url_for('main.index') }}">Home</a> |
+        {% if current_user.is_authenticated %}
+            Logged in as: {{ current_user.username }} (Type: {{ current_user.user_type }}) |
+            <a href="{{ url_for('auth.logout') }}">Logout</a>
+            {% if current_user.user_type == 'teacher' %}
+                | <a href="{{ url_for('main.create_course') }}">Create Course</a>
+            {% endif %}
+            | <a href="{{ url_for('main.list_courses') }}">View Courses</a>
+        {% else %}
+            <a href="{{ url_for('auth.login') }}">Login</a> |
+            <a href="{{ url_for('auth.register') }}">Register</a>
+        {% endif %}
+    </nav>
+    <hr>
+    <div class="content">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+          {% if messages %}
+            <ul class="flashes">
+            {% for category, message in messages %}
+              <li class="{{ category }}">{{ message }}</li>
+            {% endfor %}
+            </ul>
+          {% endif %}
+        {% endwith %}
+        {% block content %}{% endblock %}
+    </div>
+</body>
+</html>
