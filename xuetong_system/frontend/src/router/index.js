@@ -1,29 +1,22 @@
 import { createRouter, createWebHistory } from 'vue-router';
 import { useAuthStore } from '../stores/authStore';
+// import { ElMessage } from 'element-plus'; // Removed: Better not to use UI components directly in router guards
 
-// Eagerly load core layout/public pages for faster initial interaction
+// Eagerly load core layout/public pages
 import HomePage from '../views/HomePage.vue';
 import LoginPage from '../views/LoginPage.vue';
 import RegisterPage from '../views/RegisterPage.vue';
 
+// Admin Layout
+import AdminLayout from '../views/admin/AdminLayout.vue';
+
 const routes = [
-    {
-        path: '/',
-        name: 'Home',
-        component: HomePage
-    },
-    {
-        path: '/login',
-        name: 'Login',
-        component: LoginPage,
-        meta: { guestOnly: true }
-    },
-    {
-        path: '/register',
-        name: 'Register',
-        component: RegisterPage,
-        meta: { guestOnly: true }
-    },
+    // Public routes
+    { path: '/', name: 'Home', component: HomePage },
+    { path: '/login', name: 'Login', component: LoginPage, meta: { guestOnly: true } },
+    { path: '/register', name: 'Register', component: RegisterPage, meta: { guestOnly: true } },
+
+    // Authenticated user routes (non-admin)
     {
         path: '/dashboard',
         name: 'Dashboard',
@@ -79,17 +72,56 @@ const routes = [
         meta: { requiresAuth: true }
     },
     {
-        path: '/discussions/:post_id', // New route for viewing a discussion thread
+        path: '/discussions/:post_id',
         name: 'DiscussionThread',
-        component: () => import('../views/DiscussionThreadPage.vue'), // Lazy load
-        props: true, // Passes post_id as prop to the component
-        meta: { requiresAuth: true } // Protected route, component handles specific access logic
+        component: () => import('../views/DiscussionThreadPage.vue'),
+        props: true,
+        meta: { requiresAuth: true }
+    },
+
+    // Admin Routes
+    {
+        path: '/admin',
+        component: AdminLayout,
+        meta: { requiresAuth: true, requiresAdmin: true },
+        children: [
+            {
+                path: '',
+                redirect: { name: 'AdminDashboard' }
+            },
+            {
+                path: 'dashboard',
+                name: 'AdminDashboard',
+                component: () => import('../views/admin/AdminDashboardPage.vue'),
+            },
+            {
+                path: 'users',
+                name: 'AdminUserList',
+                component: () => import('../views/admin/AdminUserListPage.vue'),
+            },
+            {
+                path: 'users/:user_id',
+                name: 'AdminUserDetail',
+                component: () => import('../views/admin/AdminUserDetailPage.vue'),
+                props: true
+            },
+            {
+                path: 'courses',
+                name: 'AdminCourseList',
+                component: () => import('../views/admin/AdminCourseListPage.vue'),
+            },
+            {
+                path: 'courses/:course_id',
+                name: 'AdminCourseDetail',
+                component: () => import('../views/admin/AdminCourseDetailPage.vue'),
+                props: true
+            }
+        ]
     }
-    // Example for a 404 page - good practice to add
     // {
     //     path: '/:pathMatch(.*)*',
     //     name: 'NotFound',
-    //     component: () => import('../views/NotFoundPage.vue') // Lazy load 404
+    //     component: () => import('../views/NotFoundPage.vue')
     // }
 ];
 
@@ -109,11 +141,21 @@ const router = createRouter({
 router.beforeEach((to, from, next) => {
     const authStore = useAuthStore();
 
-    if (to.meta.requiresAuth && !authStore.isAuthenticated) {
+    if (to.matched.some(record => record.meta.requiresAdmin)) {
+        if (!authStore.isAuthenticated) {
+            authStore.setReturnUrl(to.fullPath);
+            next({ name: 'Login' });
+        } else if (!authStore.isAdmin) {
+            console.warn('Unauthorized access attempt to admin route by non-admin user.'); // Log warning
+            next({ name: 'Dashboard' }); // Redirect non-admins to their regular dashboard
+        } else {
+            next();
+        }
+    } else if (to.meta.requiresAuth && !authStore.isAuthenticated) {
         authStore.setReturnUrl(to.fullPath);
         next({ name: 'Login' });
     } else if (to.meta.guestOnly && authStore.isAuthenticated) {
-        next({ name: 'Dashboard' });
+        next({ name: authStore.isAdmin ? 'AdminDashboard' : 'Dashboard' });
     } else {
         next();
     }
