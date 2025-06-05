@@ -29,14 +29,21 @@
           <div class="course-main-header">
             <h1 class="course-title">{{ courseStore.currentCourseDetail.course_name }}</h1>
             <div class="header-actions">
-              <el-tag :type="getStatusTagType(courseStore.currentCourseDetail.status)" size="large" style="margin-right: 15px;">
+              <el-tag :type="getStatusTagType(courseStore.currentCourseDetail.status)" size="large" style="margin-right: 10px;">
                 {{ formatStatus(courseStore.currentCourseDetail.status) }}
               </el-tag>
               <router-link
                 v-if="isCourseTeacher"
                 :to="{ name: 'CreateAssignment', params: { course_id: courseId } }"
+                style="margin-right: 10px;"
               >
-                <el-button type="success" :icon="Plus">创建新作业</el-button>
+                <el-button type="success" :icon="Plus" size="small">创建作业</el-button>
+              </router-link>
+              <router-link
+                v-if="isCourseTeacher"
+                :to="{ name: 'CreateExam', params: { course_id: courseId } }"
+              >
+                <el-button type="warning" :icon="Plus" size="small">创建考试</el-button>
               </router-link>
             </div>
           </div>
@@ -87,21 +94,35 @@
         </div>
         <el-empty v-else description="该课程暂无章节信息。" class="empty-chapters"></el-empty>
 
-        <!-- Placeholder for Assignments List for this course -->
         <el-divider content-position="left"><h2 class="section-title">课程作业</h2></el-divider>
-        <div v-if="courseStore.isLoadingCourseAssignments">
+        <div v-if="courseStore.isLoadingCourseAssignments" class="loading-section">
             <p>正在加载作业列表...</p><el-skeleton :rows="3" animated />
         </div>
-        <el-alert v-else-if="courseStore.fetchCourseAssignmentsError" :title="courseStore.fetchCourseAssignmentsError" type="error" />
-        <ul v-else-if="courseStore.currentCourseAssignments && courseStore.currentCourseAssignments.length" class="assignment-list">
-            <li v-for="assignment in courseStore.currentCourseAssignments" :key="assignment.assignment_id" class="assignment-item">
-                <router-link :to="`/assignments/${assignment.assignment_id}`"> <!-- This route needs to be defined -->
+        <el-alert v-else-if="courseStore.fetchCourseAssignmentsError" :title="courseStore.fetchCourseAssignmentsError" type="error" show-icon :closable="false" />
+        <ul v-else-if="courseStore.currentCourseAssignments && courseStore.currentCourseAssignments.length" class="item-list">
+            <li v-for="assignment in courseStore.currentCourseAssignments" :key="assignment.assignment_id" class="list-item">
+                <router-link :to="`/assignments/${assignment.assignment_id}`">
                     <strong>{{ assignment.title }}</strong>
                 </router-link>
                 - 截止日期: {{ new Date(assignment.deadline).toLocaleDateString() }}
             </li>
         </ul>
-        <el-empty v-else description="该课程暂无作业信息。" :image-size="60"></el-empty>
+        <el-empty v-else description="该课程暂无作业信息。" :image-size="60" class="empty-section"></el-empty>
+
+        <el-divider content-position="left"><h2 class="section-title">课程考试</h2></el-divider>
+        <div v-if="courseStore.isLoadingCourseExams" class="loading-section">
+            <p>正在加载考试列表...</p><el-skeleton :rows="3" animated />
+        </div>
+        <el-alert v-else-if="courseStore.fetchCourseExamsError" :title="courseStore.fetchCourseExamsError" type="error" show-icon :closable="false" />
+        <ul v-else-if="courseStore.currentCourseExams && courseStore.currentCourseExams.length" class="item-list">
+            <li v-for="exam in courseStore.currentCourseExams" :key="exam.exam_id" class="list-item">
+                <router-link :to="`/exams/${exam.exam_id}`"> <!-- This route needs to be defined -->
+                    <strong>{{ exam.exam_name }}</strong>
+                </router-link>
+                - 开始时间: {{ new Date(exam.start_time).toLocaleDateString() }}
+            </li>
+        </ul>
+        <el-empty v-else description="该课程暂无考试信息。" :image-size="60" class="empty-section"></el-empty>
 
       </el-card>
     </div>
@@ -112,7 +133,7 @@
 import { computed, onMounted, onUnmounted, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import { useCourseStore } from '../../stores/courseStore';
-import { useAuthStore } from '../../stores/authStore'; // Import auth store
+import { useAuthStore } from '../../stores/authStore';
 import {
     ElCard, ElRow, ElCol, ElSkeleton, ElEmpty, ElTag, ElDivider,
     ElIcon, ElLink, ElBreadcrumb, ElBreadcrumbItem, ElAlert, ElImage, ElButton
@@ -121,14 +142,15 @@ import { VideoCamera, Document, Link as LinkIcon, User, Calendar, Clock, ArrowRi
 
 const route = useRoute();
 const courseStore = useCourseStore();
-const authStore = useAuthStore(); // Initialize auth store
+const authStore = useAuthStore();
 
 const courseId = computed(() => parseInt(route.params.id, 10));
 
 const fetchAllCourseData = () => {
   if (courseId.value) {
     courseStore.fetchCourseDetail(courseId.value);
-    courseStore.fetchAssignmentsForCourse(courseId.value); // Fetch assignments too
+    courseStore.fetchAssignmentsForCourse(courseId.value);
+    courseStore.fetchExamsForCourse(courseId.value); // Fetch exams
   }
 };
 
@@ -137,21 +159,19 @@ onMounted(() => {
 });
 
 onUnmounted(() => {
-  courseStore.clearCurrentCourseDetail(); // This also clears assignments in the modified store
+  courseStore.clearCurrentCourseDetail();
 });
 
 watch(() => route.params.id, (newId, oldId) => {
-  if (newId && newId !== oldId && newId !== courseStore.currentCourseDetail?.course_id) { // Avoid re-fetch if ID hasn't actually changed
+  if (newId && newId !== oldId && newId !== courseStore.currentCourseDetail?.course_id) {
     fetchAllCourseData();
   }
-}, { immediate: true }); // immediate: true to run watcher on initial mount if needed, though onMounted handles initial
+}, { immediate: true });
 
 const isCourseTeacher = computed(() => {
   if (!authStore.isAuthenticated || !courseStore.currentCourseDetail || !authStore.user) {
     return false;
   }
-  // Assumes authStore.user.user_id and courseStore.currentCourseDetail.teacher.user_id are available
-  // and authStore.user.user_type is populated.
   return authStore.user.user_id === courseStore.currentCourseDetail.teacher?.user_id && authStore.user.user_type === 2;
 });
 
@@ -167,8 +187,8 @@ const getStatusTagType = (status) => {
 
 const formatDate = (dateString) => {
   if (!dateString) return 'N/A';
-  const date = new Date(dateString + 'T00:00:00');
-  return date.toLocaleDateString();
+  // Using toLocaleDateString for simpler date formatting, can be more specific if needed
+  return new Date(dateString).toLocaleDateString();
 };
 
 const getMaterialIcon = (materialType) => {
@@ -195,12 +215,20 @@ const formatDuration = (seconds) => {
 
 <style scoped>
 .course-detail-container { padding: 20px; background-color: #f9fafb; }
-.loading-container, .empty-container { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 300px; }
+.loading-container, .empty-container, .loading-section {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 150px; /* Adjusted for sections */
+    padding: 20px;
+}
 .error-alert { margin-bottom: 20px; }
 .course-breadcrumb { margin-bottom: 20px; font-size: 0.9em; }
 .course-main-card { border-radius: 8px; }
 .course-main-header { display: flex; justify-content: space-between; align-items: center; }
 .header-actions { display: flex; align-items: center; }
+.header-actions .el-button { font-size: 0.9em; } /* Smaller buttons in header */
 .course-title { font-size: 2em; font-weight: 600; color: #303133; margin: 0; }
 .course-meta-info { margin-top: 10px; margin-bottom: 20px; }
 .course-meta-info p { margin: 8px 0; color: #606266; font-size: 0.95em; display: flex; align-items: center; }
@@ -210,7 +238,7 @@ const formatDuration = (seconds) => {
 .course-detail-cover-image { max-height: 250px; width: 100%; border-radius: 6px; object-fit: contain; }
 .image-slot-detail { display: flex; justify-content: center; align-items: center; width: 100%; height: 100%; min-height: 150px; background: #f5f7fa; color: #c0c4cc; font-size: 0.9em; }
 .section-title { font-size: 1.4em; font-weight: 600; color: #303133; margin: 0; }
-.chapters-section, .assignment-list-section { margin-top: 10px; } /* Added assignment-list-section */
+.chapters-section, .assignment-list-section, .exam-list-section { margin-top: 10px; } /* Added exam-list-section */
 .chapter-card { margin-bottom: 20px; border-left: 3px solid #409EFF; }
 .chapter-header span { font-size: 1.2em; font-weight: 500; color: #303133; }
 .chapter-description { font-size: 0.9em; color: #606266; margin-top: 5px; margin-bottom: 15px; white-space: pre-wrap; }
@@ -220,10 +248,10 @@ const formatDuration = (seconds) => {
 .material-icon { margin-right: 8px; font-size: 1.2em; color: #409EFF; }
 .material-link { font-size: 1em; }
 .material-duration { font-size: 0.85em; color: #909399; margin-left: 10px; }
-.empty-materials, .empty-chapters { margin-top: 10px; }
+.empty-materials, .empty-chapters, .empty-section { margin-top: 10px; }
 
-.assignment-list { list-style: none; padding: 0; margin-top: 15px; }
-.assignment-item {
+.item-list { list-style: none; padding: 0; margin-top: 15px; } /* Generic list for assignments/exams */
+.list-item {
   padding: 10px;
   margin-bottom: 10px;
   border: 1px solid #ebeef5;
@@ -231,10 +259,10 @@ const formatDuration = (seconds) => {
   background-color: #fff;
   transition: box-shadow 0.2s ease;
 }
-.assignment-item:hover {
+.list-item:hover {
   box-shadow: 0 2px 8px rgba(0,0,0,0.1);
 }
-.assignment-item strong {
+.list-item strong {
   color: #409EFF;
 }
 </style>

@@ -17,17 +17,24 @@ export const useCourseStore = defineStore('course', {
         currentCourseAssignments: [],
         isLoadingCourseAssignments: false,
         fetchCourseAssignmentsError: null,
-
-        // New state for creating assignments
         isCreatingAssignment: false,
         createAssignmentError: null,
+
+        // New state for exams within a course context
+        currentCourseExams: [],
+        isLoadingCourseExams: false,
+        fetchCourseExamsError: null,
+        isCreatingExam: false,
+        createExamError: null,
     }),
     getters: {
         allCourses: (state) => state.courses,
         getCourseDetails: (state) => state.currentCourseDetail,
         getCourseAssignments: (state) => state.currentCourseAssignments,
+        getCourseExams: (state) => state.currentCourseExams, // New getter
     },
     actions: {
+        // ... (existing actions for courses and assignments) ...
         async fetchCourses() {
             this.isLoadingCourses = true;
             this.fetchCoursesError = null;
@@ -48,9 +55,10 @@ export const useCourseStore = defineStore('course', {
             this.isLoadingCourseDetail = true;
             this.fetchCourseDetailError = null;
             this.currentCourseDetail = null;
-            // Also clear assignments when fetching new course detail, as they belong to the previous course
-            this.currentCourseAssignments = [];
+            this.currentCourseAssignments = []; // Clear related data
             this.fetchCourseAssignmentsError = null;
+            this.currentCourseExams = []; // Clear related data
+            this.fetchCourseExamsError = null;
             try {
                 const response = await apiClient.get(`/courses/${courseId}`);
                 this.currentCourseDetail = response.data;
@@ -85,8 +93,10 @@ export const useCourseStore = defineStore('course', {
         clearCurrentCourseDetail() {
             this.currentCourseDetail = null;
             this.fetchCourseDetailError = null;
-            this.currentCourseAssignments = []; // Also clear assignments
+            this.currentCourseAssignments = [];
             this.fetchCourseAssignmentsError = null;
+            this.currentCourseExams = [];
+            this.fetchCourseExamsError = null;
         },
 
         clearCreateCourseError() {
@@ -114,22 +124,13 @@ export const useCourseStore = defineStore('course', {
             this.fetchCourseAssignmentsError = null;
         },
 
-        // New action for creating an assignment for a course
         async createAssignmentForCourse(courseId, assignmentData) {
             this.isCreatingAssignment = true;
             this.createAssignmentError = null;
             try {
-                // Assumes apiClient is configured to send JWT (handled by request interceptor in apiClient.js)
                 const response = await apiClient.post(`/courses/${courseId}/assignments`, assignmentData);
-                // After creating, add to the current list of assignments for this course
-                if (response.data && this.currentCourseDetail?.course_id === courseId) {
+                if (response.data && this.currentCourseDetail?.course_id === parseInt(courseId)) { // Ensure courseId is number for comparison
                     this.currentCourseAssignments.push(response.data);
-                    // Or sort by deadline/id if desired.
-                } else if (response.data) {
-                    // If we are not on the course detail page that matches this courseId,
-                    // we might not need to update currentCourseAssignments, or we could fetch them again.
-                    // For now, just adding if it matches the currently viewed course context.
-                    // Alternatively, always re-fetch: this.fetchAssignmentsForCourse(courseId);
                 }
                 return { success: true, data: response.data };
             } catch (err) {
@@ -144,6 +145,51 @@ export const useCourseStore = defineStore('course', {
 
         clearCreateAssignmentError() {
             this.createAssignmentError = null;
+        },
+
+        // New actions for course exams
+        async fetchExamsForCourse(courseId) {
+            this.isLoadingCourseExams = true;
+            this.fetchCourseExamsError = null;
+            this.currentCourseExams = []; // Clear previous exams
+            try {
+                const response = await apiClient.get(`/courses/${courseId}/exams`);
+                this.currentCourseExams = response.data;
+            } catch (err) {
+                const message = err.response?.data?.message || err.message || 'Failed to fetch exams for course.';
+                this.fetchCourseExamsError = message;
+                console.error(`Error fetching exams for course ID ${courseId}:`, message);
+            } finally {
+                this.isLoadingCourseExams = false;
+            }
+        },
+
+        async createExamForCourse(courseId, examData) {
+            this.isCreatingExam = true;
+            this.createExamError = null;
+            try {
+                const response = await apiClient.post(`/courses/${courseId}/exams`, examData);
+                if (response.data && this.currentCourseDetail?.course_id === parseInt(courseId)) { // Ensure courseId is number
+                    this.currentCourseExams.push(response.data);
+                }
+                return { success: true, data: response.data };
+            } catch (err) {
+                const message = err.response?.data?.message || err.message || 'Failed to create exam.';
+                this.createExamError = message;
+                console.error(`Error creating exam for course ID ${courseId}:`, message);
+                return { success: false, error: message };
+            } finally {
+                this.isCreatingExam = false;
+            }
+        },
+
+        clearCourseExams() {
+            this.currentCourseExams = [];
+            this.fetchCourseExamsError = null;
+        },
+
+        clearCreateExamError() {
+            this.createExamError = null;
         }
     },
 });

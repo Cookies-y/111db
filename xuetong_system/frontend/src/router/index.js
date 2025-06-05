@@ -5,11 +5,6 @@ import { useAuthStore } from '../stores/authStore';
 import HomePage from '../views/HomePage.vue';
 import LoginPage from '../views/LoginPage.vue';
 import RegisterPage from '../views/RegisterPage.vue';
-// Dashboard and other authenticated views can be lazy-loaded
-// import DashboardPage from '../views/DashboardPage.vue';
-// import CourseDetailPage from '../views/CourseDetailPage.vue';
-// import CourseCreatePage from '../views/CourseCreatePage.vue';
-// import AssignmentCreatePage from '../views/AssignmentCreatePage.vue';
 
 const routes = [
     {
@@ -32,35 +27,49 @@ const routes = [
     {
         path: '/dashboard',
         name: 'Dashboard',
-        component: () => import('../views/DashboardPage.vue'), // Lazy load
+        component: () => import('../views/DashboardPage.vue'),
         meta: { requiresAuth: true }
     },
     {
         path: '/courses/:id',
         name: 'CourseDetail',
-        component: () => import('../views/CourseDetailPage.vue'), // Lazy load
+        component: () => import('../views/CourseDetailPage.vue'),
         props: true,
         meta: { requiresAuth: true }
     },
     {
         path: '/create-course',
         name: 'CreateCourse',
-        component: () => import('../views/CourseCreatePage.vue'), // Lazy load
-        meta: { requiresAuth: true } // Component handles teacher role check
+        component: () => import('../views/CourseCreatePage.vue'),
+        meta: { requiresAuth: true }
     },
     {
         path: '/courses/:course_id/create-assignment',
         name: 'CreateAssignment',
-        component: () => import('../views/AssignmentCreatePage.vue'), // Lazy load
+        component: () => import('../views/AssignmentCreatePage.vue'),
         props: true,
-        meta: { requiresAuth: true } // Component handles teacher role check
+        meta: { requiresAuth: true }
     },
     {
-        path: '/assignments/:id', // New route for Assignment Detail
+        path: '/assignments/:id',
         name: 'AssignmentDetail',
-        component: () => import('../views/AssignmentDetailPage.vue'), // Lazy load
+        component: () => import('../views/AssignmentDetailPage.vue'),
         props: true,
-        meta: { requiresAuth: true } // Protected route, component handles specific access logic (student/teacher)
+        meta: { requiresAuth: true }
+    },
+    {
+        path: '/courses/:course_id/create-exam',
+        name: 'CreateExam',
+        component: () => import('../views/ExamCreatePage.vue'),
+        props: true,
+        meta: { requiresAuth: true }
+    },
+    {
+        path: '/exams/:id', // New route for Exam Detail
+        name: 'ExamDetail',
+        component: () => import('../views/ExamDetailPage.vue'), // Lazy load
+        props: true,
+        meta: { requiresAuth: true }
     }
     // Example for a 404 page - good practice to add
     // {
