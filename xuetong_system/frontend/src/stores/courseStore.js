@@ -20,21 +20,27 @@ export const useCourseStore = defineStore('course', {
         isCreatingAssignment: false,
         createAssignmentError: null,
 
-        // New state for exams within a course context
         currentCourseExams: [],
         isLoadingCourseExams: false,
         fetchCourseExamsError: null,
         isCreatingExam: false,
         createExamError: null,
+
+        // New state for discussion topics within a course context
+        currentCourseDiscussionTopics: [],
+        isLoadingCourseDiscussionTopics: false,
+        fetchCourseDiscussionTopicsError: null,
+        isCreatingDiscussionTopic: false,
+        createDiscussionTopicError: null,
     }),
     getters: {
         allCourses: (state) => state.courses,
         getCourseDetails: (state) => state.currentCourseDetail,
         getCourseAssignments: (state) => state.currentCourseAssignments,
-        getCourseExams: (state) => state.currentCourseExams, // New getter
+        getCourseExams: (state) => state.currentCourseExams,
+        getCourseDiscussionTopics: (state) => state.currentCourseDiscussionTopics, // New getter
     },
     actions: {
-        // ... (existing actions for courses and assignments) ...
         async fetchCourses() {
             this.isLoadingCourses = true;
             this.fetchCoursesError = null;
@@ -55,10 +61,12 @@ export const useCourseStore = defineStore('course', {
             this.isLoadingCourseDetail = true;
             this.fetchCourseDetailError = null;
             this.currentCourseDetail = null;
-            this.currentCourseAssignments = []; // Clear related data
-            this.fetchCourseAssignmentsError = null;
-            this.currentCourseExams = []; // Clear related data
-            this.fetchCourseExamsError = null;
+
+            // Clear all related sub-data for the course
+            this.clearCourseAssignments();
+            this.clearCourseExams();
+            this.clearCourseDiscussionData(); // New call
+
             try {
                 const response = await apiClient.get(`/courses/${courseId}`);
                 this.currentCourseDetail = response.data;
@@ -93,10 +101,9 @@ export const useCourseStore = defineStore('course', {
         clearCurrentCourseDetail() {
             this.currentCourseDetail = null;
             this.fetchCourseDetailError = null;
-            this.currentCourseAssignments = [];
-            this.fetchCourseAssignmentsError = null;
-            this.currentCourseExams = [];
-            this.fetchCourseExamsError = null;
+            this.clearCourseAssignments();
+            this.clearCourseExams();
+            this.clearCourseDiscussionData(); // New call
         },
 
         clearCreateCourseError() {
@@ -129,7 +136,7 @@ export const useCourseStore = defineStore('course', {
             this.createAssignmentError = null;
             try {
                 const response = await apiClient.post(`/courses/${courseId}/assignments`, assignmentData);
-                if (response.data && this.currentCourseDetail?.course_id === parseInt(courseId)) { // Ensure courseId is number for comparison
+                if (response.data && this.currentCourseDetail?.course_id === parseInt(courseId)) {
                     this.currentCourseAssignments.push(response.data);
                 }
                 return { success: true, data: response.data };
@@ -147,11 +154,10 @@ export const useCourseStore = defineStore('course', {
             this.createAssignmentError = null;
         },
 
-        // New actions for course exams
         async fetchExamsForCourse(courseId) {
             this.isLoadingCourseExams = true;
             this.fetchCourseExamsError = null;
-            this.currentCourseExams = []; // Clear previous exams
+            this.currentCourseExams = [];
             try {
                 const response = await apiClient.get(`/courses/${courseId}/exams`);
                 this.currentCourseExams = response.data;
@@ -169,7 +175,7 @@ export const useCourseStore = defineStore('course', {
             this.createExamError = null;
             try {
                 const response = await apiClient.post(`/courses/${courseId}/exams`, examData);
-                if (response.data && this.currentCourseDetail?.course_id === parseInt(courseId)) { // Ensure courseId is number
+                if (response.data && this.currentCourseDetail?.course_id === parseInt(courseId)) {
                     this.currentCourseExams.push(response.data);
                 }
                 return { success: true, data: response.data };
@@ -190,6 +196,49 @@ export const useCourseStore = defineStore('course', {
 
         clearCreateExamError() {
             this.createExamError = null;
-        }
+        },
+
+        // New actions for course discussion topics
+        async fetchDiscussionTopicsForCourse(courseId) {
+            this.isLoadingCourseDiscussionTopics = true;
+            this.fetchCourseDiscussionTopicsError = null;
+            this.currentCourseDiscussionTopics = [];
+            try {
+                const response = await apiClient.get(`/courses/${courseId}/discussions`);
+                this.currentCourseDiscussionTopics = response.data;
+            } catch (err) {
+                const message = err.response?.data?.message || err.message || 'Failed to fetch discussion topics for course.';
+                this.fetchCourseDiscussionTopicsError = message;
+                console.error(`Error fetching discussion topics for course ID ${courseId}:`, message);
+            } finally {
+                this.isLoadingCourseDiscussionTopics = false;
+            }
+        },
+
+        async createDiscussionTopic(courseId, topicData) {
+            this.isCreatingDiscussionTopic = true;
+            this.createDiscussionTopicError = null;
+            try {
+                const response = await apiClient.post(`/courses/${courseId}/discussions`, topicData);
+                if (response.data && this.currentCourseDetail?.course_id === parseInt(courseId)) {
+                    this.currentCourseDiscussionTopics.unshift(response.data); // Add to top
+                }
+                return { success: true, data: response.data };
+            } catch (err) {
+                const message = err.response?.data?.message || err.message || 'Failed to create discussion topic.';
+                this.createDiscussionTopicError = message;
+                console.error(`Error creating discussion topic for course ID ${courseId}:`, message);
+                return { success: false, error: message };
+            } finally {
+                this.isCreatingDiscussionTopic = false;
+            }
+        },
+
+        clearCourseDiscussionData() {
+            this.currentCourseDiscussionTopics = [];
+            this.fetchCourseDiscussionTopicsError = null;
+            this.createDiscussionTopicError = null; // Also clear creation error
+        },
+        // No clearCreateDiscussionTopicError needed if cleared in clearCourseDiscussionData
     },
 });

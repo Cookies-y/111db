@@ -65,11 +65,25 @@ const routes = [
         meta: { requiresAuth: true }
     },
     {
-        path: '/exams/:id', // New route for Exam Detail
+        path: '/exams/:id',
         name: 'ExamDetail',
-        component: () => import('../views/ExamDetailPage.vue'), // Lazy load
+        component: () => import('../views/ExamDetailPage.vue'),
         props: true,
         meta: { requiresAuth: true }
+    },
+    {
+        path: '/courses/:course_id/discussions/new',
+        name: 'CreateDiscussionTopic',
+        component: () => import('../views/DiscussionCreateTopicPage.vue'),
+        props: true,
+        meta: { requiresAuth: true }
+    },
+    {
+        path: '/discussions/:post_id', // New route for viewing a discussion thread
+        name: 'DiscussionThread',
+        component: () => import('../views/DiscussionThreadPage.vue'), // Lazy load
+        props: true, // Passes post_id as prop to the component
+        meta: { requiresAuth: true } // Protected route, component handles specific access logic
     }
     // Example for a 404 page - good practice to add
     // {
