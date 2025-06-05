@@ -1,14 +1,15 @@
 import { createRouter, createWebHistory } from 'vue-router';
-import { useAuthStore } from '../stores/authStore'; // Import the Pinia auth store
+import { useAuthStore } from '../stores/authStore';
 
-// Import view components
+// Eagerly load core layout/public pages for faster initial interaction
 import HomePage from '../views/HomePage.vue';
 import LoginPage from '../views/LoginPage.vue';
 import RegisterPage from '../views/RegisterPage.vue';
-import DashboardPage from '../views/DashboardPage.vue'; // This is the main course listing page currently
-import CourseDetailPage from '../views/CourseDetailPage.vue';
-import CourseCreatePage from '../views/CourseCreatePage.vue'; // Import the new page
-// import NotFoundPage from '../views/NotFoundPage.vue'; // Example for a 404 page
+// Dashboard and other authenticated views can be lazy-loaded
+// import DashboardPage from '../views/DashboardPage.vue';
+// import CourseDetailPage from '../views/CourseDetailPage.vue';
+// import CourseCreatePage from '../views/CourseCreatePage.vue';
+// import AssignmentCreatePage from '../views/AssignmentCreatePage.vue';
 
 const routes = [
     {
@@ -29,23 +30,37 @@ const routes = [
         meta: { guestOnly: true }
     },
     {
-        path: '/dashboard', // Currently serves as the course listing page
+        path: '/dashboard',
         name: 'Dashboard',
-        component: DashboardPage,
+        component: () => import('../views/DashboardPage.vue'), // Lazy load
         meta: { requiresAuth: true }
     },
     {
-        path: '/courses/:id', // Route for individual course details
+        path: '/courses/:id',
         name: 'CourseDetail',
-        component: CourseDetailPage,
-        props: true, // Passes route.params (like :id) as props to the component
-        meta: { requiresAuth: true } // Protected route
+        component: () => import('../views/CourseDetailPage.vue'), // Lazy load
+        props: true,
+        meta: { requiresAuth: true }
     },
     {
         path: '/create-course',
         name: 'CreateCourse',
-        component: CourseCreatePage,
-        meta: { requiresAuth: true } // Protected route, component will check for teacher role
+        component: () => import('../views/CourseCreatePage.vue'), // Lazy load
+        meta: { requiresAuth: true } // Component handles teacher role check
+    },
+    {
+        path: '/courses/:course_id/create-assignment',
+        name: 'CreateAssignment',
+        component: () => import('../views/AssignmentCreatePage.vue'), // Lazy load
+        props: true,
+        meta: { requiresAuth: true } // Component handles teacher role check
+    },
+    {
+        path: '/assignments/:id', // New route for Assignment Detail
+        name: 'AssignmentDetail',
+        component: () => import('../views/AssignmentDetailPage.vue'), // Lazy load
+        props: true,
+        meta: { requiresAuth: true } // Protected route, component handles specific access logic (student/teacher)
     }
     // Example for a 404 page - good practice to add
     // {
@@ -59,7 +74,6 @@ const router = createRouter({
     history: createWebHistory(import.meta.env.BASE_URL),
     routes,
     scrollBehavior(to, from, savedPosition) {
-        // Always scroll to top when navigating to a new page
         if (savedPosition) {
             return savedPosition;
         } else {
@@ -78,13 +92,6 @@ router.beforeEach((to, from, next) => {
     } else if (to.meta.guestOnly && authStore.isAuthenticated) {
         next({ name: 'Dashboard' });
     } else {
-        // Add role check here if desired for routes with meta.requiresRole
-        // For example:
-        // if (to.meta.requiresRole && to.meta.requiresRole !== authStore.user?.role_name_or_id) {
-        //    next({ name: 'AccessDenied' }); // Or redirect to dashboard with error
-        // } else {
-        //    next();
-        // }
         next();
     }
 });

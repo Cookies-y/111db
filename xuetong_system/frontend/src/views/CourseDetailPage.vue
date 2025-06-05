@@ -28,14 +28,22 @@
         <template #header>
           <div class="course-main-header">
             <h1 class="course-title">{{ courseStore.currentCourseDetail.course_name }}</h1>
-            <el-tag :type="getStatusTagType(courseStore.currentCourseDetail.status)" size="large">
-              {{ formatStatus(courseStore.currentCourseDetail.status) }}
-            </el-tag>
+            <div class="header-actions">
+              <el-tag :type="getStatusTagType(courseStore.currentCourseDetail.status)" size="large" style="margin-right: 15px;">
+                {{ formatStatus(courseStore.currentCourseDetail.status) }}
+              </el-tag>
+              <router-link
+                v-if="isCourseTeacher"
+                :to="{ name: 'CreateAssignment', params: { course_id: courseId } }"
+              >
+                <el-button type="success" :icon="Plus">创建新作业</el-button>
+              </router-link>
+            </div>
           </div>
         </template>
 
         <el-row :gutter="20" class="course-meta-info">
-          <el-col :span="16">
+          <el-col :span="courseStore.currentCourseDetail.cover_image ? 16 : 24">
             <p class="course-description">{{ courseStore.currentCourseDetail.description || '暂无详细描述。' }}</p>
             <p><strong><el-icon><User /></el-icon> 授课教师:</strong> {{ courseStore.currentCourseDetail.teacher?.real_name || 'N/A' }}</p>
             <p><strong><el-icon><Calendar /></el-icon> 课程日期:</strong> {{ formatDate(courseStore.currentCourseDetail.start_date) }} 至 {{ formatDate(courseStore.currentCourseDetail.end_date) }}</p>
@@ -78,45 +86,73 @@
           </el-card>
         </div>
         <el-empty v-else description="该课程暂无章节信息。" class="empty-chapters"></el-empty>
+
+        <!-- Placeholder for Assignments List for this course -->
+        <el-divider content-position="left"><h2 class="section-title">课程作业</h2></el-divider>
+        <div v-if="courseStore.isLoadingCourseAssignments">
+            <p>正在加载作业列表...</p><el-skeleton :rows="3" animated />
+        </div>
+        <el-alert v-else-if="courseStore.fetchCourseAssignmentsError" :title="courseStore.fetchCourseAssignmentsError" type="error" />
+        <ul v-else-if="courseStore.currentCourseAssignments && courseStore.currentCourseAssignments.length" class="assignment-list">
+            <li v-for="assignment in courseStore.currentCourseAssignments" :key="assignment.assignment_id" class="assignment-item">
+                <router-link :to="`/assignments/${assignment.assignment_id}`"> <!-- This route needs to be defined -->
+                    <strong>{{ assignment.title }}</strong>
+                </router-link>
+                - 截止日期: {{ new Date(assignment.deadline).toLocaleDateString() }}
+            </li>
+        </ul>
+        <el-empty v-else description="该课程暂无作业信息。" :image-size="60"></el-empty>
+
       </el-card>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
+import { computed, onMounted, onUnmounted, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import { useCourseStore } from '../../stores/courseStore';
+import { useAuthStore } from '../../stores/authStore'; // Import auth store
 import {
     ElCard, ElRow, ElCol, ElSkeleton, ElEmpty, ElTag, ElDivider,
-    ElIcon, ElLink, ElBreadcrumb, ElBreadcrumbItem, ElAlert, ElImage
+    ElIcon, ElLink, ElBreadcrumb, ElBreadcrumbItem, ElAlert, ElImage, ElButton
 } from 'element-plus';
-import { VideoCamera, Document, Link as LinkIcon, User, Calendar, Clock, ArrowRight } from '@element-plus/icons-vue';
+import { VideoCamera, Document, Link as LinkIcon, User, Calendar, Clock, ArrowRight, Plus } from '@element-plus/icons-vue';
 
 const route = useRoute();
 const courseStore = useCourseStore();
+const authStore = useAuthStore(); // Initialize auth store
 
 const courseId = computed(() => parseInt(route.params.id, 10));
 
-const fetchDetails = () => {
+const fetchAllCourseData = () => {
   if (courseId.value) {
     courseStore.fetchCourseDetail(courseId.value);
+    courseStore.fetchAssignmentsForCourse(courseId.value); // Fetch assignments too
   }
 };
 
 onMounted(() => {
-  fetchDetails();
+  fetchAllCourseData();
 });
 
 onUnmounted(() => {
-  courseStore.clearCurrentCourseDetail();
+  courseStore.clearCurrentCourseDetail(); // This also clears assignments in the modified store
 });
 
-// Watch for changes in route param id to re-fetch if navigating between course detail pages
 watch(() => route.params.id, (newId, oldId) => {
-  if (newId && newId !== oldId) {
-    fetchDetails();
+  if (newId && newId !== oldId && newId !== courseStore.currentCourseDetail?.course_id) { // Avoid re-fetch if ID hasn't actually changed
+    fetchAllCourseData();
   }
+}, { immediate: true }); // immediate: true to run watcher on initial mount if needed, though onMounted handles initial
+
+const isCourseTeacher = computed(() => {
+  if (!authStore.isAuthenticated || !courseStore.currentCourseDetail || !authStore.user) {
+    return false;
+  }
+  // Assumes authStore.user.user_id and courseStore.currentCourseDetail.teacher.user_id are available
+  // and authStore.user.user_type is populated.
+  return authStore.user.user_id === courseStore.currentCourseDetail.teacher?.user_id && authStore.user.user_type === 2;
 });
 
 const formatStatus = (status) => {
@@ -125,22 +161,21 @@ const formatStatus = (status) => {
 };
 
 const getStatusTagType = (status) => {
-  const statusTypes = { 1: "info", 2: "success", 3: "warning" }; // Default for unknown
+  const statusTypes = { 1: "info", 2: "success", 3: "warning" };
   return statusTypes[status] || "default";
 };
 
 const formatDate = (dateString) => {
   if (!dateString) return 'N/A';
-  // Assuming dateString is YYYY-MM-DD from backend (fields.Date)
-  const date = new Date(dateString + 'T00:00:00'); // Add time part to avoid timezone issues if any
-  return date.toLocaleDateString(); // Uses browser's locale
+  const date = new Date(dateString + 'T00:00:00');
+  return date.toLocaleDateString();
 };
 
 const getMaterialIcon = (materialType) => {
-  if (materialType === 1) return VideoCamera; // Video
-  if (materialType === 2) return Document;    // Document
-  if (materialType === 3) return LinkIcon;    // Link
-  return Document; // Default icon
+  if (materialType === 1) return VideoCamera;
+  if (materialType === 2) return Document;
+  if (materialType === 3) return LinkIcon;
+  return Document;
 };
 
 const formatDuration = (seconds) => {
@@ -159,134 +194,47 @@ const formatDuration = (seconds) => {
 </script>
 
 <style scoped>
-.course-detail-container {
-  padding: 20px;
-  background-color: #f9fafb; /* Light background */
-}
-.loading-container, .empty-container {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  min-height: 300px;
-}
-.error-alert {
-  margin-bottom: 20px;
-}
-.course-breadcrumb {
-  margin-bottom: 20px;
-  font-size: 0.9em;
-}
-.course-main-card {
-  border-radius: 8px;
-}
-.course-main-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-.course-title {
-  font-size: 2em;
-  font-weight: 600;
-  color: #303133;
-  margin: 0;
-}
-.course-meta-info {
-  margin-top: 10px;
-  margin-bottom: 20px;
-}
-.course-meta-info p {
-  margin: 8px 0;
-  color: #606266;
-  font-size: 0.95em;
-  display: flex;
-  align-items: center;
-}
-.course-meta-info .el-icon {
-  margin-right: 6px;
-  font-size: 1.1em;
-}
-.course-description {
-  color: #303133;
-  line-height: 1.7;
-  margin-bottom: 15px !important; /* Override p margin */
-}
-.cover-image-col {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.course-detail-cover-image {
-  max-height: 250px;
-  width: 100%;
-  border-radius: 6px;
-  object-fit: contain; /* Or 'cover' depending on desired effect */
-}
-.image-slot-detail {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  width: 100%;
-  height: 100%;
-  min-height: 150px; /* Ensure slot has some height */
-  background: #f5f7fa;
-  color: #c0c4cc;
-  font-size: 0.9em;
-}
-.section-title {
-  font-size: 1.4em;
-  font-weight: 600;
-  color: #303133;
-  margin: 0; /* Reset margin if ElDivider adds its own */
-}
-.chapters-section {
-  margin-top: 10px;
-}
-.chapter-card {
-  margin-bottom: 20px;
-  border-left: 3px solid #409EFF; /* Accent for chapters */
-}
-.chapter-header span {
-  font-size: 1.2em;
-  font-weight: 500;
-  color: #303133;
-}
-.chapter-description {
-  font-size: 0.9em;
-  color: #606266;
-  margin-top: 5px;
-  margin-bottom: 15px;
-  white-space: pre-wrap; /* Preserve formatting if any */
-}
-.material-list {
-  list-style: none;
-  padding-left: 0;
-}
-.material-item {
-  display: flex;
-  align-items: center;
+.course-detail-container { padding: 20px; background-color: #f9fafb; }
+.loading-container, .empty-container { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 300px; }
+.error-alert { margin-bottom: 20px; }
+.course-breadcrumb { margin-bottom: 20px; font-size: 0.9em; }
+.course-main-card { border-radius: 8px; }
+.course-main-header { display: flex; justify-content: space-between; align-items: center; }
+.header-actions { display: flex; align-items: center; }
+.course-title { font-size: 2em; font-weight: 600; color: #303133; margin: 0; }
+.course-meta-info { margin-top: 10px; margin-bottom: 20px; }
+.course-meta-info p { margin: 8px 0; color: #606266; font-size: 0.95em; display: flex; align-items: center; }
+.course-meta-info .el-icon { margin-right: 6px; font-size: 1.1em; }
+.course-description { color: #303133; line-height: 1.7; margin-bottom: 15px !important; }
+.cover-image-col { display: flex; align-items: center; justify-content: center; }
+.course-detail-cover-image { max-height: 250px; width: 100%; border-radius: 6px; object-fit: contain; }
+.image-slot-detail { display: flex; justify-content: center; align-items: center; width: 100%; height: 100%; min-height: 150px; background: #f5f7fa; color: #c0c4cc; font-size: 0.9em; }
+.section-title { font-size: 1.4em; font-weight: 600; color: #303133; margin: 0; }
+.chapters-section, .assignment-list-section { margin-top: 10px; } /* Added assignment-list-section */
+.chapter-card { margin-bottom: 20px; border-left: 3px solid #409EFF; }
+.chapter-header span { font-size: 1.2em; font-weight: 500; color: #303133; }
+.chapter-description { font-size: 0.9em; color: #606266; margin-top: 5px; margin-bottom: 15px; white-space: pre-wrap; }
+.material-list { list-style: none; padding-left: 0; }
+.material-item { display: flex; align-items: center; margin-bottom: 10px; padding: 8px; border-radius: 4px; transition: background-color 0.2s ease; }
+.material-item:hover { background-color: #f5f7fa; }
+.material-icon { margin-right: 8px; font-size: 1.2em; color: #409EFF; }
+.material-link { font-size: 1em; }
+.material-duration { font-size: 0.85em; color: #909399; margin-left: 10px; }
+.empty-materials, .empty-chapters { margin-top: 10px; }
+
+.assignment-list { list-style: none; padding: 0; margin-top: 15px; }
+.assignment-item {
+  padding: 10px;
   margin-bottom: 10px;
-  padding: 8px;
+  border: 1px solid #ebeef5;
   border-radius: 4px;
-  transition: background-color 0.2s ease;
+  background-color: #fff;
+  transition: box-shadow 0.2s ease;
 }
-.material-item:hover {
-  background-color: #f5f7fa;
+.assignment-item:hover {
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
 }
-.material-icon {
-  margin-right: 8px;
-  font-size: 1.2em;
+.assignment-item strong {
   color: #409EFF;
-}
-.material-link {
-  font-size: 1em;
-}
-.material-duration {
-  font-size: 0.85em;
-  color: #909399;
-  margin-left: 10px;
-}
-.empty-materials, .empty-chapters {
-  margin-top: 10px;
 }
 </style>
