@@ -55,7 +55,10 @@ def create_app():
     from .auth_api import auth_ns
     api.add_namespace(auth_ns, path='/auth')
 
-    # Placeholder for other future namespaces
+    from .course_api import course_ns
+    api.add_namespace(course_ns, path='/courses')
+
+    # Placeholder for other future namespaces (e.g., enrollment, assignments etc.)
 
     # --- CLI Commands ---
     @app.cli.command("init-db")

@@ -3,168 +3,263 @@
     <el-card shadow="never" class="dashboard-card">
       <template #header>
         <div class="card-header">
-          <span>仪表盘</span>
+          <span>仪表盘 - 课程列表</span>
+          <div v-if="authStore.isAuthenticated && authStore.user?.user_type === 2" class="create-course-button-container">
+            <router-link to="/create-course"> <!-- This route needs to be defined -->
+                <el-button type="primary" :icon="Plus">创建新课程</el-button>
+            </router-link>
+          </div>
         </div>
       </template>
 
-      <div v-if="authStore.isAuthenticated && authStore.user" class="content">
+      <div v-if="authStore.isAuthenticated" class="content">
         <p class="welcome-message">
-          欢迎回来, <strong>{{ authStore.user.email || '用户' }}</strong>！
+          欢迎回来, <strong>{{ authStore.user?.email || '用户' }}</strong>！
+          <!-- (用户类型: {{ authStore.user?.user_type }}) -->
         </p>
-        <p>
-          您的用户ID (来自JWT): <strong>{{ decodedUserId || '无法解析或未登录' }}</strong>
-        </p>
-        <!--
-          Note: authStore.user currently only stores { email: credentials.email } upon login.
-          To display user_type or real_name here, the authStore.login action would need to:
-          1. Decode the JWT to get claims (if they are included in the token by the backend).
-          2. OR, make a separate API call to a '/users/me' endpoint to fetch full user details.
-          For now, we'll keep it simple and rely on email and what can be decoded from token.
-        -->
-        <p>这里是您的仪表盘。后续将在此处展示课程管理、学习进度等内容。</p>
 
-        <div class="quick-actions">
-          <h3>快速操作 (占位符)</h3>
-          <ul>
-            <li><router-link to="/courses-overview">所有课程概览</router-link></li>
-            <!-- Example for teacher-specific link -->
-            <!-- <li v-if="authStore.user?.user_type_from_token === 'teacher'"><router-link :to="{ name: 'CreateCourse' }">创建新课程</router-link></li> -->
-            <li><router-link to="/my-profile">我的资料</router-link></li>
-          </ul>
+        <div v-if="courseStore.isLoadingCourses" class="loading-container">
+          <el-skeleton :rows="6" animated />
         </div>
+        <el-alert
+          v-else-if="courseStore.fetchCoursesError"
+          :title="courseStore.fetchCoursesError"
+          type="error"
+          show-icon
+          :closable="false"
+          class="error-alert"
+        />
+        <el-empty
+          v-else-if="!courseStore.allCourses || courseStore.allCourses.length === 0"
+          description="暂无课程，教师可以创建新课程。"
+          class="empty-courses"
+        />
+        <el-row :gutter="20" v-else class="course-list">
+          <el-col
+            :xs="24" :sm="12" :md="8"
+            v-for="course in courseStore.allCourses"
+            :key="course.course_id"
+            class="course-col"
+          >
+            <el-card shadow="hover" class="course-card-item">
+              <template #header>
+                <div class="course-card-header">
+                  <span>{{ course.course_name }}</span>
+                </div>
+              </template>
+              <div class="course-cover-image-container">
+                <el-image
+                  v-if="course.cover_image"
+                  :src="course.cover_image"
+                  :alt="course.course_name"
+                  fit="cover"
+                  class="course-cover-image"
+                >
+                  <template #error><div class="image-slot">图片加载失败</div></template>
+                </el-image>
+                <div v-else class="course-cover-image-placeholder">暂无封面</div>
+              </div>
+              <div class="course-content-details">
+                <p class="course-description" :title="course.description">
+                  {{ course.description ? (course.description.length > 80 ? course.description.substring(0, 80) + '...' : course.description) : '暂无描述' }}
+                </p>
+                <p><strong>教师:</strong> {{ course.teacher?.real_name || 'N/A' }}</p>
+                <p>
+                  <strong>状态:</strong>
+                  <el-tag :type="getStatusTagType(course.status)" size="small">{{ formatStatus(course.status) }}</el-tag>
+                </p>
+                <p><small>创建于: {{ new Date(course.create_time).toLocaleDateString() }}</small></p>
+              </div>
+              <template #footer>
+                <div class="course-card-footer">
+                  <router-link :to="`/courses/${course.course_id}`"> <!-- This route needs to be defined -->
+                    <el-button type="primary" plain size="small">查看详情</el-button>
+                  </router-link>
+                </div>
+              </template>
+            </el-card>
+          </el-col>
+        </el-row>
       </div>
 
       <div v-else class="content">
-        <!-- This part should ideally not be reached if route guards are working correctly -->
-        <el-alert
-          title="未授权访问"
-          type="warning"
-          description="您需要登录才能查看此页面。正在重定向到登录页..."
-          show-icon
-          :closable="false"
-        />
+        <el-alert title="未授权访问" type="warning" description="您需要登录才能查看此页面。" show-icon :closable="false" />
       </div>
     </el-card>
   </div>
 </template>
 
 <script setup>
-import { computed, onMounted } from 'vue';
+import { onMounted, computed } from 'vue';
 import { useAuthStore } from '../../stores/authStore';
-import { useRouter } // To redirect if needed, though guard should handle it.
+import { useCourseStore } from '../../stores/courseStore';
+import { ElCard, ElRow, ElCol, ElSkeleton, ElEmpty, ElButton, ElTag, ElAlert, ElImage } from 'element-plus';
+import { Plus } from '@element-plus/icons-vue'; // For the create course button icon
 
 const authStore = useAuthStore();
-const router = useRouter();
-
-// Attempt to decode user_id from the token for display purposes
-const decodedUserId = computed(() => {
-  if (authStore.accessToken) {
-    try {
-      const payloadBase64 = authStore.accessToken.split('.')[1];
-      const decodedPayload = JSON.parse(atob(payloadBase64));
-      return payloadBase64.sub || 'N/A'; // 'sub' is the standard claim for subject (user ID)
-    } catch (e) {
-      console.error("Error decoding JWT for display:", e);
-      return '解码错误';
-    }
-  }
-  return null;
-});
+const courseStore = useCourseStore();
 
 onMounted(() => {
-  if (!authStore.isAuthenticated) {
-    // This is a fallback, router guard should ideally handle this.
-    // router.push({ name: 'Login', query: { redirect: router.currentRoute.value.fullPath } });
-    console.warn("Dashboard accessed by unauthenticated user - router guard might need review or this is direct access attempt.");
+  if (authStore.isAuthenticated) {
+    courseStore.fetchCourses();
   }
-  // Example: If you wanted to fetch dashboard-specific data
-  // fetchDashboardData();
 });
 
-// function fetchDashboardData() {
-//   console.log("Fetching dashboard data for user:", authStore.user?.email);
-//   // apiClient.get('/dashboard-data').then(...)
-// }
+const formatStatus = (status) => {
+  const statuses = { 1: "未开始", 2: "进行中", 3: "已结束" };
+  return statuses[status] || "未知状态";
+};
+
+const getStatusTagType = (status) => {
+  const statusTypes = { 1: "info", 2: "success", 3: "warning" };
+  return statusTypes[status] || "default";
+};
+
+// Placeholder for user_type in authStore.user.
+// This computed property is an example of how it might be used if available.
+// For now, the v-if for "Create Course" button directly checks authStore.user?.user_type === 2
+const isTeacher = computed(() => {
+  return authStore.isAuthenticated && authStore.user?.user_type === 2; // 2 for teacher
+});
+
 </script>
 
 <style scoped>
 .dashboard-container {
-  padding: 2rem;
-  background-color: #f9fafb; /* Lighter background for contrast with card */
-  flex-grow: 1;
+  padding: 20px;
+  background-color: #f9fafb;
 }
 
-.dashboard-card {
-  max-width: 900px;
+.dashboard-card { /* This is the main outer card */
+  max-width: 1200px; /* Allow wider content for course list */
   margin: 0 auto;
-  border: none; /* Remove card border if background provides enough contrast */
   border-radius: 8px;
 }
 
 .card-header {
-  border-bottom: 1px solid #ebeef5; /* Element Plus card header border color */
-  padding-bottom: 10px; /* Ensure space for border */
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 1.5em;
+  font-weight: 600;
+  color: #303133;
 }
 
-.card-header span {
-  font-size: 1.6em; /* Larger title */
-  font-weight: 600; /* Bolder */
-  color: #303133; /* Element Plus primary text color */
+.create-course-button-container {
+  /* Styles for the container of the create course button if needed */
 }
 
 .content {
-  padding: 1rem 0; /* Padding inside card body */
+  padding-top: 10px;
 }
 
 .welcome-message {
-  font-size: 1.2em;
-  color: #333;
-  margin-bottom: 1rem;
-}
-
-.welcome-message strong {
-  color: #409EFF; /* Highlight user email */
-}
-
-p {
-  line-height: 1.7;
-  color: #606266; /* Element Plus secondary text color */
-  margin-bottom: 0.8rem;
-}
-
-.quick-actions {
-  margin-top: 2rem;
-  padding-top: 1.5rem;
-  border-top: 1px solid #e4e7ed;
-}
-
-.quick-actions h3 {
   font-size: 1.1em;
-  color: #303133;
-  margin-bottom: 1rem;
+  color: #333;
+  margin-bottom: 20px;
 }
-
-.quick-actions ul {
-  list-style: none;
-  padding: 0;
-}
-
-.quick-actions li {
-  margin-bottom: 0.5rem;
-}
-
-.quick-actions a {
+.welcome-message strong {
   color: #409EFF;
-  text-decoration: none;
-  transition: color 0.2s ease;
 }
 
-.quick-actions a:hover {
-  color: #66b1ff; /* Lighter blue on hover */
-  text-decoration: underline;
+.loading-container {
+  padding: 20px;
 }
 
-.el-alert {
-  margin-top: 1rem;
+.error-alert {
+  margin-bottom: 20px;
+}
+
+.empty-courses {
+  margin-top: 30px;
+  margin-bottom: 30px;
+}
+
+.course-list {
+  /* Styles for the row containing course cards */
+}
+
+.course-col {
+  margin-bottom: 20px;
+}
+
+.course-card-item {
+  height: 100%; /* Make cards in a row equal height if content varies */
+  display: flex;
+  flex-direction: column;
+  transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+}
+.course-card-item:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+
+
+.course-card-header span {
+  font-weight: bold;
+  font-size: 1.1em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.course-cover-image-container {
+  width: 100%;
+  height: 150px; /* Fixed height for image container */
+  background-color: #f5f7fa; /* Placeholder color */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+.course-cover-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover; /* Ensure image covers the area */
+}
+.course-cover-image-placeholder {
+  color: #909399;
+  font-size: 0.9em;
+}
+.image-slot {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+  height: 100%;
+  background: #f5f7fa;
+  color: #c0c4cc;
+}
+
+.course-content-details {
+  padding: 16px;
+  flex-grow: 1; /* Allows this section to take available space */
+}
+
+.course-description {
+  font-size: 0.9em;
+  color: #606266;
+  margin-bottom: 10px;
+  height: 3.6em; /* Approx 2 lines with 1.8 line-height */
+  line-height: 1.8;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  /* For multi-line ellipsis, more complex CSS might be needed or JS solution */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+.course-content-details p {
+  margin-bottom: 8px;
+  font-size: 0.9em;
+}
+.course-content-details p strong {
+  color: #303133;
+}
+
+.course-card-footer {
+  padding: 10px 16px;
+  border-top: 1px solid #ebeef5;
+  text-align: right; /* Align button to the right */
 }
 </style>
