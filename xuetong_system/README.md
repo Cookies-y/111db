@@ -1,24 +1,23 @@
-# XueTong System (MVP)
+# XueTong System - API Backend (Phase 1)
 
 ## Overview
 
-XueTong System is a Minimum Viable Product (MVP) for a simple online learning platform. It allows users to register with distinct roles (Student or Teacher), log in, and interact with course content. Teachers can create courses, and all authenticated users can view a list of available courses. This project serves as a basic demonstration of web application development using Flask.
+This is the backend API for the XueTong System, an online learning platform. This phase of the project focuses on establishing a robust, pure API backend designed to be consumed by a separate frontend application (e.g., built with Vue.js, React, or Angular). The current system provides core functionalities including a detailed database schema, user authentication (registration and JWT-based login), and initial API endpoints.
 
-## Features Implemented (MVP)
+## Features Implemented (Backend - Phase 1)
 
-*   **User Authentication:**
-    *   User registration with 'Student' and 'Teacher' roles.
-    *   Secure user login and logout functionality.
-    *   Password hashing for security (using Werkzeug).
-*   **Course Management:**
-    *   Teachers can create new courses, providing a course name and description.
-    *   All authenticated users can view a list of available courses, including details like course name, description, teacher, and creation date.
-*   **Role-Based Access Control (RBAC):**
-    *   Basic RBAC is implemented, e.g., only users with the 'Teacher' role can access the course creation page and functionality.
-*   **Frontend:**
-    *   User interface implemented using Flask's Jinja2 templating engine.
-    *   Basic styling provided by CSS.
-    *   Flashed messages for user feedback (e.g., success on registration, login errors).
+*   **Comprehensive Database Schema:**
+    *   Includes 11 models representing Users, Courses, Chapters, Materials, Assignments, Submissions, Exams, Exam Results, Discussions, Enrollments, and Progress.
+*   **User Management & Authentication:**
+    *   User registration API (`/auth/register`) allowing creation of 'student' and 'teacher' accounts.
+    *   User login API (`/auth/login`) which, upon successful authentication, returns a JSON Web Token (JWT).
+    *   Secure password hashing using Bcrypt.
+    *   JWT-based authentication for securing API endpoints.
+*   **API Endpoints:**
+    *   A protected test endpoint (`/auth/protected`) to verify JWT authentication.
+*   **Command-Line Interface (CLI) Utilities:**
+    *   `flask init-db`: A command to initialize the database, creating all tables based on the defined models.
+    *   `flask create-admin`: A command to create an initial administrator user with specified credentials.
 
 ## Project Structure
 
@@ -26,22 +25,14 @@ The project is primarily contained within the `xuetong_system/` directory:
 
 *   `backend/`: Contains the Flask application and all related files.
     *   `app/`: The core application package.
-        *   `models.py`: Defines database models (User, Course) using Flask-SQLAlchemy.
-        *   `forms.py`: Defines forms for registration, login, and course creation using Flask-WTF.
-        *   `auth_routes.py`: Handles authentication routes (login, register, logout).
-        *   `main_routes.py`: Handles main application routes (course listing, course creation, index).
-        *   `__init__.py`: Initializes the Flask application, extensions, and blueprints.
-        *   `templates/`: Contains Jinja2 HTML templates.
-            *   `auth/`: Templates for authentication pages.
-            *   `main/`: Templates for main application pages.
-            *   `base.html`: Base layout template.
-        *   `static/`: Contains static files (currently only CSS).
-            *   `css/style.css`: Main stylesheet.
+        *   `models.py`: Defines all 11 SQLAlchemy database models.
+        *   `auth_api.py`: Defines API routes and logic for authentication (registration, login) and user-related operations using Flask-RESTx.
+        *   `__init__.py`: Initializes the Flask application, extensions (SQLAlchemy, Bcrypt, JWTManager, Flask-RESTx API), and registers API namespaces and CLI commands.
+        *   *(Note: `templates/`, `static/`, and `forms.py` have been removed as part of the shift to a pure API backend.)*
     *   `instance/`: This directory is created automatically. The SQLite database file (`xuetong.sqlite3`) will be stored here.
     *   `venv/`: The Python virtual environment directory (should be created by the user).
-    *   `run.py`: A Python script used to start the Flask development server.
+    *   `run.py`: A Python script used to start the Flask development API server.
     *   `requirements.txt`: Lists the Python dependencies for the project.
-*   `frontend/`: This directory was initially planned for separate frontend development (e.g., with a JavaScript framework). However, for this MVP, the frontend is server-side rendered and integrated within the `backend/app/templates/` and `backend/app/static/` directories.
 *   `.gitignore`: Specifies intentionally untracked files that Git should ignore.
 *   `README.md`: This file.
 
@@ -78,35 +69,113 @@ The project is primarily contained within the `xuetong_system/` directory:
     ```bash
     pip install -r requirements.txt
     ```
+    This will install Flask, Flask-RESTx, Flask-SQLAlchemy, Flask-JWT-Extended, Flask-Bcrypt, and other necessary packages.
 
-## Running the Application
+## Running the API Application
 
 1.  **Ensure Location and Environment:**
     Make sure you are still in the `xuetong_system/backend/` directory and that your virtual environment (`venv`) is activated.
 
-2.  **Run the Development Server:**
+2.  **Set Flask App Environment Variable (Optional but Recommended):**
+    For Flask CLI commands to work smoothly, you might need to set the `FLASK_APP` environment variable.
+    *   On macOS/Linux:
+        ```bash
+        export FLASK_APP=run.py
+        ```
+    *   On Windows (cmd.exe):
+        ```bash
+        set FLASK_APP=run.py
+        ```
+    *   On Windows (PowerShell):
+        ```bash
+        $env:FLASK_APP = "run.py"
+        ```
+    Alternatively, you can invoke Flask directly: `python -m flask <command>`.
+
+3.  **Initialize the Database:**
+    Before running the application for the first time, or if you've made changes to the models, initialize the database:
+    ```bash
+    flask init-db
+    ```
+    This command creates all necessary tables in the `instance/xuetong.sqlite3` database file.
+
+4.  **Create an Admin User (Recommended):**
+    Use the CLI command to create an initial admin user:
+    ```bash
+    flask create-admin --username youradmin --email admin@example.com --password yoursecurepassword --real_name "Admin User"
+    ```
+    Replace placeholders with your desired admin credentials.
+
+5.  **Run the Development API Server:**
     Execute the `run.py` script:
     ```bash
     python run.py
     ```
+    The API server will start, typically available at `http://127.0.0.1:5001/`. This backend serves API endpoints; there is no browser UI directly served by this application.
 
-3.  **Access the Application:**
-    The application will typically be available in your web browser at:
-    `http://127.0.0.1:5001/`
-    (The port `5001` is specified in `run.py`; if you change it there, use the new port).
+## API Endpoints Overview
 
-4.  **Database Creation:**
-    On the first run, if the database file does not exist, it will be automatically created at `xuetong_system/backend/instance/xuetong.sqlite3`.
+The API is organized using Flask-RESTx. Interactive API documentation via Swagger UI is typically available at the root URL of the API (e.g., `http://127.0.0.1:5001/`) when the development server is running.
 
-## Technology Stack (MVP)
+You can also test endpoints using tools like Postman or `curl`.
 
-*   **Backend:** Python, Flask framework
-*   **Database:** SQLite (via Flask-SQLAlchemy)
-*   **Templating:** Jinja2 (comes with Flask)
-*   **Forms:** Flask-WTF (integrates WTForms with Flask)
-*   **Authentication:** Flask-Login for session management
-*   **Password Hashing:** Werkzeug (a Flask dependency)
-*   **Frontend Styling:** Basic CSS
+**Key Authentication Endpoints (base path: `/auth`):**
+
+*   **`POST /auth/register`**: Register a new user.
+    *   **Request Body (JSON):**
+        ```json
+        {
+            "username": "newstudent",
+            "password": "password123",
+            "real_name": "New Student",
+            "email": "newstudent@example.com",
+            "user_type": "student"
+        }
+        ```
+    *   **Success Response (201 Created):** User details (excluding password).
+    *   **Error Responses:** 400 (validation error), 409 (user already exists).
+
+*   **`POST /auth/login`**: Log in an existing user.
+    *   **Request Body (JSON):**
+        ```json
+        {
+            "email": "newstudent@example.com",
+            "password": "password123"
+        }
+        ```
+    *   **Success Response (200 OK):**
+        ```json
+        {
+            "access_token": "<JWT_TOKEN>"
+        }
+        ```
+    *   **Error Responses:** 401 (invalid credentials).
+
+*   **`GET /auth/protected`**: A sample endpoint to test JWT authentication.
+    *   **Headers:**
+        *   `Authorization: Bearer <JWT_TOKEN>`
+    *   **Success Response (200 OK):**
+        ```json
+        {
+            "message": "Hello User ID <id>! This is a protected endpoint.",
+            "current_user_id": <id>
+        }
+        ```
+    *   **Error Responses:** 401 (missing or invalid token).
+
+*(Note: If a global API prefix like `/api` is configured in Flask-RESTx, these paths would be `/api/auth/register`, etc.)*
+
+## Technology Stack
+
+*   **Backend Framework:** Python, Flask
+*   **API Development:** Flask-RESTx
+*   **Database ORM:** Flask-SQLAlchemy
+*   **Database:** SQLite (for development/MVP)
+*   **Authentication:** JWT (JSON Web Tokens) via Flask-JWT-Extended and PyJWT
+*   **Password Hashing:** Flask-Bcrypt
+*   **Data Validation:** `email-validator` (for email format validation in models/logic, if used beyond WTForms)
+*   **CLI:** Click (Flask's default CLI library)
+*   **WSGI Server (Flask dev server):** Werkzeug
 
 ---
-This README provides a good starting point for understanding and running the XueTong System MVP.
+This README provides guidance for setting up, running, and interacting with the XueTong System API backend.
