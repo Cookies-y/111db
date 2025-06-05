@@ -238,6 +238,26 @@ You can also test endpoints using tools like Postman or `curl`.
         *   **Request Body (JSON):** `score` (integer).
         *   **Response (200 OK):** Updated exam result object.
 
+**Discussions Endpoints (JWT required for all):**
+
+*   **Course Discussions:**
+    *   **`GET /courses/<course_id>/discussions/`**: List top-level discussion topics for a course.
+        *   **Access:** Course Teacher, Enrolled Students.
+        *   **Response:** Array of discussion topic objects (includes `reply_count`).
+    *   **`POST /courses/<course_id>/discussions/`**: Create a new discussion topic in a course.
+        *   **Access:** Course Teacher, Enrolled Students.
+        *   **Request Body (JSON):** `title` (string, required), `content` (string, required).
+        *   **Response (201 Created):** Newly created discussion topic object.
+
+*   **Discussion Operations:**
+    *   **`GET /discussions/<post_id>/thread`**: Get a specific discussion topic with its direct replies.
+        *   **Access:** Course Teacher, Enrolled Students (of the post's course).
+        *   **Response:** Discussion topic object with a nested list of direct replies.
+    *   **`POST /discussions/<parent_post_id>/replies`**: Post a reply to a specific discussion post.
+        *   **Access:** Course Teacher, Enrolled Students (of the parent post's course).
+        *   **Request Body (JSON):** `content` (string, required). (Title is ignored/auto-generated for replies).
+        *   **Response (201 Created):** Newly created reply object.
+
 *(Note: If a global API prefix like `/api` is configured in Flask-RESTx, these paths would be, for example, `/api/courses/<course_id>/assignments/`.)*
 
 ## Technology Stack
