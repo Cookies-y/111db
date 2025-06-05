@@ -1,12 +1,10 @@
 {% extends "base.html" %}
 
-{% block title %}Login - XueTong System{% endblock %}
+{% block title %}登录 - 学通系统{% endblock %}
 
 {% block content %}
-    <h1>Login</h1>
-    {# Flash messages are now handled in base.html, so no need to repeat here unless specific placement is needed #}
-    {# However, it's fine to keep them if you want messages very close to the form #}
-    {# For this example, I'll remove the explicit flashed_messages block from here as base.html has it #}
+    <h1>用户登录</h1>
+    {# Flash messages are now handled in base.html #}
 
     <form method="POST" action="{{ url_for('auth.login') }}">
         {{ form.csrf_token }}
@@ -28,7 +26,7 @@
                 </ul>
             {% endif %}
         </p>
-        <p>{{ form.submit() }}</p>
+        <p>{{ form.submit(value='登录') }}</p>
     </form>
-    <p>New user? <a href="{{ url_for('auth.register') }}">Click to Register!</a></p>
+    <p>新用户？ <a href="{{ url_for('auth.register') }}">点此注册！</a></p>
 {% endblock %}

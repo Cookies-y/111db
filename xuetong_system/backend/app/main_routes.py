@@ -18,13 +18,14 @@ def index():
 @login_required
 def list_courses():
     courses = Course.query.all()
+    # Title attr will be handled by template translation
     return render_template('main/list_courses.html', courses=courses, title="Available Courses")
 
 @main_bp.route('/create_course', methods=['GET', 'POST'])
 @login_required
 def create_course():
     if current_user.user_type != 'teacher':
-        flash('Only teachers can create courses.', 'danger')
+        flash('只有教师才能创建课程。', 'danger')
         return redirect(url_for('main.list_courses'))
 
     form = CourseForm()
@@ -36,7 +37,8 @@ def create_course():
         )
         db.session.add(course)
         db.session.commit()
-        flash('Course created successfully!', 'success')
+        flash('课程创建成功！', 'success')
         return redirect(url_for('main.list_courses'))
 
+    # Title attr will be handled by template translation
     return render_template('main/create_course.html', title='Create New Course', form=form)

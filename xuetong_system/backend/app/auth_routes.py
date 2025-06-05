@@ -29,9 +29,9 @@ def register():
         user.set_password(form.password.data)
         db.session.add(user)
         db.session.commit()
-        flash('Congratulations, you are now a registered user!', 'success')
+        flash('恭喜您，注册成功！', 'success')
         return redirect(url_for('auth.login'))
-    return render_template('auth/register.html', title='Register', form=form)
+    return render_template('auth/register.html', title='Register', form=form) # Title attr will be handled by template translation
 
 @auth_bp.route('/login', methods=['GET', 'POST'])
 def login():
@@ -44,15 +44,15 @@ def login():
             login_user(user)
             # next_page = request.args.get('next') # For redirecting after login
             # return redirect(next_page) if next_page else redirect(url_for('main.index'))
-            flash('Login successful.', 'success')
+            flash('登录成功。', 'success')
             return redirect(url_for('main.index')) # Simplified redirect for now
         else:
-            flash('Login Unsuccessful. Please check email and password', 'danger')
-    return render_template('auth/login.html', title='Login', form=form)
+            flash('登录失败，请检查邮箱和密码。', 'danger')
+    return render_template('auth/login.html', title='Login', form=form) # Title attr will be handled by template translation
 
 @auth_bp.route('/logout')
 @login_required
 def logout():
     logout_user()
-    flash('You have been logged out.', 'info')
+    flash('您已成功登出。', 'info')
     return redirect(url_for('auth.login'))
