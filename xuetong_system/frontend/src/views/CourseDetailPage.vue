@@ -1,10 +1,10 @@
 <template>
   <div class="course-detail-container">
-    <div v-if="courseStore.isLoadingCourseDetail" class="loading-container">
+    <div v-if="courseStore.isLoadingCourseDetail && !courseStore.currentCourseDetail" class="loading-container">
       <el-skeleton :rows="10" animated />
     </div>
     <el-alert
-      v-else-if="courseStore.fetchCourseDetailError"
+      v-else-if="courseStore.fetchCourseDetailError && !courseStore.currentCourseDetail"
       :title="courseStore.fetchCourseDetailError"
       type="error"
       description="无法加载课程详情，请稍后再试或返回课程列表。"
@@ -55,6 +55,14 @@
             <p><strong><el-icon><User /></el-icon> 授课教师:</strong> {{ courseStore.currentCourseDetail.teacher?.real_name || 'N/A' }}</p>
             <p><strong><el-icon><Calendar /></el-icon> 课程日期:</strong> {{ formatDate(courseStore.currentCourseDetail.start_date) }} 至 {{ formatDate(courseStore.currentCourseDetail.end_date) }}</p>
             <p><small><strong><el-icon><Clock /></el-icon> 创建时间:</strong> {{ new Date(courseStore.currentCourseDetail.create_time).toLocaleString() }}</small></p>
+
+            <!-- Student Progress Summary (Optional) -->
+            <div v-if="isStudent && totalMaterials > 0" class="progress-summary">
+                <p><strong>课程进度:</strong></p>
+                <el-progress :percentage="courseCompletionPercentage" :stroke-width="10" />
+                <p style="font-size:0.9em; color: #606266;">已完成 {{ completedMaterialsCount }} / {{ totalMaterials }} 个学习资料</p>
+            </div>
+
           </el-col>
           <el-col :span="8" v-if="courseStore.currentCourseDetail.cover_image" class="cover-image-col">
             <el-image
@@ -83,10 +91,19 @@
             </template>
             <p v-if="chapter.description" class="chapter-description">{{ chapter.description }}</p>
             <ul v-if="chapter.materials && chapter.materials.length" class="material-list">
-              <li v-for="material in chapter.materials" :key="material.material_id" class="material-item">
+              <li v-for="material in chapter.materials" :key="material.material_id" class="material-item" :class="{ 'completed-material': isStudent && progressStore.getCompletionStatusByMaterialId(material.material_id) }">
+                <el-checkbox
+                  v-if="isStudent"
+                  :model-value="progressStore.getCompletionStatusByMaterialId(material.material_id)"
+                  @change="(newStatus) => handleToggleMaterialCompletion(material.material_id, newStatus)"
+                  :disabled="progressStore.isMaterialProgressUpdating(material.material_id)"
+                  size="large"
+                  style="margin-right: 10px;"
+                />
                 <el-icon class="material-icon"><component :is="getMaterialIcon(material.material_type)" /></el-icon>
                 <el-link :href="material.url" target="_blank" type="primary" class="material-link">{{ material.title }}</el-link>
                 <span v-if="material.material_type === 1 && material.duration" class="material-duration"> (时长: {{ formatDuration(material.duration) }})</span>
+                <el-tag v-if="isStudent && progressStore.getCompletionStatusByMaterialId(material.material_id)" type="success" size="small" style="margin-left: auto;">已完成</el-tag>
               </li>
             </ul>
             <el-empty v-else description="本章节暂无学习资料" :image-size="50" class="empty-materials"></el-empty>
@@ -162,24 +179,31 @@ import { computed, onMounted, onUnmounted, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import { useCourseStore } from '../../stores/courseStore';
 import { useAuthStore } from '../../stores/authStore';
+import { useProgressStore } from '../../stores/progressStore'; // Import progress store
 import {
     ElCard, ElRow, ElCol, ElSkeleton, ElEmpty, ElTag, ElDivider,
-    ElIcon, ElLink, ElBreadcrumb, ElBreadcrumbItem, ElAlert, ElImage, ElButton, ElTable, ElTableColumn
+    ElIcon, ElLink, ElBreadcrumb, ElBreadcrumbItem, ElAlert, ElImage,
+    ElButton, ElTable, ElTableColumn, ElCheckbox, ElProgress // Added ElCheckbox, ElProgress
 } from 'element-plus';
 import { VideoCamera, Document, Link as LinkIcon, User, Calendar, Clock, ArrowRight, Plus, ChatDotSquare } from '@element-plus/icons-vue';
 
 const route = useRoute();
 const courseStore = useCourseStore();
 const authStore = useAuthStore();
+const progressStore = useProgressStore(); // Initialize progress store
 
 const courseId = computed(() => parseInt(route.params.id, 10));
+const isStudent = computed(() => authStore.isAuthenticated && authStore.user?.user_type === 1);
 
-const fetchAllCourseData = () => {
+const fetchAllCourseData = async () => {
   if (courseId.value) {
-    courseStore.fetchCourseDetail(courseId.value);
-    courseStore.fetchAssignmentsForCourse(courseId.value);
-    courseStore.fetchExamsForCourse(courseId.value);
-    courseStore.fetchDiscussionTopicsForCourse(courseId.value); // Fetch discussion topics
+    await courseStore.fetchCourseDetail(courseId.value);
+    await courseStore.fetchAssignmentsForCourse(courseId.value);
+    await courseStore.fetchExamsForCourse(courseId.value);
+    await courseStore.fetchDiscussionTopicsForCourse(courseId.value);
+    if (isStudent.value) { // Fetch progress only if user is a student
+      await progressStore.fetchMaterialProgressForCourse(courseId.value);
+    }
   }
 };
 
@@ -189,14 +213,20 @@ onMounted(() => {
 
 onUnmounted(() => {
   courseStore.clearCurrentCourseDetail();
+  if(isStudent.value) { // Clear progress store if student was viewing
+    progressStore.clearProgressForCourse();
+  }
 });
 
-watch(() => route.params.id, (newId, oldId) => {
-  // Ensure newId is valid and different from the current course detail's ID if it exists
-  if (newId && newId !== oldId && (newId !== courseStore.currentCourseDetail?.course_id)) {
+watch(() => route.params.id, (newIdStr, oldIdStr) => {
+  const newId = newIdStr ? parseInt(newIdStr) : null;
+  if (newId && newId !== (courseStore.currentCourseDetail?.course_id || null)) {
     fetchAllCourseData();
+  } else if (!newId && courseStore.currentCourseDetail) { // Navigated away from a valid courseId
+    courseStore.clearCurrentCourseDetail();
+    if(isStudent.value) progressStore.clearProgressForCourse();
   }
-}, { immediate: false }); // Changed immediate to false as onMounted handles initial call
+}, { immediate: false });
 
 const isCourseTeacher = computed(() => {
   if (!authStore.isAuthenticated || !courseStore.currentCourseDetail || !authStore.user) {
@@ -204,6 +234,28 @@ const isCourseTeacher = computed(() => {
   }
   return authStore.user.user_id === courseStore.currentCourseDetail.teacher?.user_id && authStore.user.user_type === 2;
 });
+
+const totalMaterials = computed(() => {
+    if (!courseStore.currentCourseDetail || !courseStore.currentCourseDetail.chapters) return 0;
+    return courseStore.currentCourseDetail.chapters.reduce((count, chapter) => count + (chapter.materials?.length || 0), 0);
+});
+
+const completedMaterialsCount = computed(() => {
+    if (!isStudent.value || !progressStore.getMaterialProgressForCurrentCourse.length) return 0;
+    return progressStore.getMaterialProgressForCurrentCourse.filter(p => p.is_completed).length;
+});
+
+const courseCompletionPercentage = computed(() => {
+    if (totalMaterials.value === 0) return 0;
+    return Math.round((completedMaterialsCount.value / totalMaterials.value) * 100);
+});
+
+async function handleToggleMaterialCompletion(materialId, newStatus) {
+  // courseId.value is already available in the component's scope
+  await progressStore.markMaterialProgress(materialId, newStatus);
+  // The store action handles UI messages and optimistic updates.
+  // If not optimistic, could re-fetch: await progressStore.fetchMaterialProgressForCourse(courseId.value);
+}
 
 const formatStatus = (status) => {
   const statuses = { 1: "未开始", 2: "进行中", 3: "已结束" };
@@ -249,7 +301,7 @@ const formatDuration = (seconds) => {
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    min-height: 100px; /* Reduced for sub-sections */
+    min-height: 100px;
     padding: 15px;
 }
 .error-alert { margin-bottom: 20px; }
@@ -272,33 +324,30 @@ const formatDuration = (seconds) => {
 .chapter-header span { font-size: 1.2em; font-weight: 500; color: #303133; }
 .chapter-description { font-size: 0.9em; color: #606266; margin-top: 5px; margin-bottom: 15px; white-space: pre-wrap; }
 .material-list { list-style: none; padding-left: 0; }
-.material-item { display: flex; align-items: center; margin-bottom: 10px; padding: 8px; border-radius: 4px; transition: background-color 0.2s ease; }
-.material-item:hover { background-color: #f5f7fa; }
+.material-item {
+  display: flex;
+  align-items: center;
+  margin-bottom: 10px;
+  padding: 8px;
+  border-radius: 4px;
+  transition: background-color 0.2s ease;
+}
+.material-item:hover { background-color: #f0f4f8; }
+.material-item.completed-material .material-link {
+  text-decoration: line-through;
+  color: #a9a9a9;
+}
 .material-icon { margin-right: 8px; font-size: 1.2em; color: #409EFF; }
 .material-link { font-size: 1em; }
 .material-duration { font-size: 0.85em; color: #909399; margin-left: 10px; }
 .empty-materials, .empty-chapters, .empty-section { margin-top: 10px; }
 
 .item-list { list-style: none; padding: 0; margin-top: 15px; }
-.list-item {
-  padding: 10px;
-  margin-bottom: 10px;
-  border: 1px solid #ebeef5;
-  border-radius: 4px;
-  background-color: #fff;
-  transition: box-shadow 0.2s ease;
-}
-.list-item:hover {
-  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-}
-.list-item strong {
-  color: #409EFF;
-}
-.discussion-toolbar {
-  margin-bottom: 15px;
-  text-align: right;
-}
-.discussion-table {
-  margin-top: 15px;
-}
+.list-item { padding: 10px; margin-bottom: 10px; border: 1px solid #ebeef5; border-radius: 4px; background-color: #fff; transition: box-shadow 0.2s ease; }
+.list-item:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+.list-item strong { color: #409EFF; }
+.discussion-toolbar { margin-bottom: 15px; text-align: right; }
+.discussion-table { margin-top: 15px; }
+.progress-summary { margin-top: 15px; padding-top:15px; border-top: 1px solid #eee;}
+.progress-summary p { margin-bottom: 5px;}
 </style>
