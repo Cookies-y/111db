@@ -207,6 +207,37 @@ You can also test endpoints using tools like Postman or `curl`.
         *   **Request Body (JSON):** `score` (integer), `feedback` (optional string).
         *   **Response (200 OK):** Updated submission object with grade.
 
+**Exams & Exam Results Endpoints (JWT required for all):**
+
+*   **Exams:**
+    *   **`GET /courses/<course_id>/exams/`**: List exams for a specific course.
+        *   **Access:** Course Teacher, Enrolled Students.
+        *   **Response:** Array of exam objects.
+    *   **`POST /courses/<course_id>/exams/`**: Create a new exam for a course.
+        *   **Access:** Course Teacher only.
+        *   **Request Body (JSON):** `exam_name` (string), `description` (optional string), `start_time` (ISO 8601 DateTime), `end_time` (ISO 8601 DateTime), `total_score` (int, default 100), `duration` (int, minutes).
+        *   **Response (201 Created):** Newly created exam object.
+    *   **`GET /exams/<exam_id>`**: Get details of a specific exam.
+        *   **Access:** Course Teacher, Enrolled Students. (Teachers may see all results; students see their own if submitted - details TBC by API implementation).
+        *   **Response:** Exam object (potentially with results for teachers).
+
+*   **Exam Submissions/Results:**
+    *   **`POST /exams/<exam_id>/submit`**: Student "submits" their exam (e.g., by providing their score for MVP).
+        *   **Access:** Enrolled Student in the course of the exam.
+        *   **Request Body (JSON):** `score` (integer).
+        *   **Response (201 Created):** Newly created exam result object.
+        *   **Notes:** Checks if exam is active and if already submitted.
+    *   **`GET /exams/<exam_id>/results`**: List all results for a specific exam.
+        *   **Access:** Course Teacher only.
+        *   **Response:** Array of exam result objects.
+    *   **`GET /exam-results/<result_id>`**: Get details of a specific exam result.
+        *   **Access:** Submitting Student or Course Teacher.
+        *   **Response:** Exam result object.
+    *   **`PUT /exam-results/<result_id>`**: Teacher updates/overrides an exam result (e.g., score).
+        *   **Access:** Course Teacher only.
+        *   **Request Body (JSON):** `score` (integer).
+        *   **Response (200 OK):** Updated exam result object.
+
 *(Note: If a global API prefix like `/api` is configured in Flask-RESTx, these paths would be, for example, `/api/courses/<course_id>/assignments/`.)*
 
 ## Technology Stack

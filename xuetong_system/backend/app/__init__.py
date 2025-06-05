@@ -63,6 +63,11 @@ def create_app():
     api.add_namespace(assignment_ops_ns)     # Path: /assignments
     api.add_namespace(submission_ops_ns)     # Path: /submissions
 
+    from .exam_api import course_exams_ns, exam_ops_ns, exam_result_ops_ns
+    api.add_namespace(course_exams_ns)       # Path: /courses/<int:course_id>/exams
+    api.add_namespace(exam_ops_ns)           # Path: /exams/<int:exam_id>
+    api.add_namespace(exam_result_ops_ns)    # Path: /exam-results
+
     # Placeholder for other future namespaces (e.g., enrollment etc.)
 
     # --- CLI Commands ---
