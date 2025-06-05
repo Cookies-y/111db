@@ -163,7 +163,51 @@ You can also test endpoints using tools like Postman or `curl`.
         ```
     *   **Error Responses:** 401 (missing or invalid token).
 
-*(Note: If a global API prefix like `/api` is configured in Flask-RESTx, these paths would be `/api/auth/register`, etc.)*
+**Course Endpoints (base path: `/courses`):**
+
+*   **`GET /courses/`**: List all available courses.
+    *   **Authentication:** Not explicitly required by current implementation for listing, but could be added.
+    *   **Success Response (200 OK):** Array of course objects (summary view).
+*   **`POST /courses/`**: Create a new course.
+    *   **Authentication:** JWT required (Role: Teacher of the course).
+    *   **Request Body (JSON):** `course_name`, `description`, `start_date`, `end_date`, `status`, `cover_image` (optional).
+    *   **Success Response (201 Created):** Detailed new course object.
+*   **`GET /courses/<course_id>`**: Get details of a specific course, including chapters and materials.
+    *   **Authentication:** Not explicitly required by current implementation, but could be added (e.g., for enrolled students or public courses).
+    *   **Success Response (200 OK):** Detailed course object.
+
+**Assignments & Submissions Endpoints:**
+
+*   **Assignments (JWT required for all):**
+    *   **`GET /courses/<course_id>/assignments/`**: List assignments for a specific course.
+        *   **Access:** Course Teacher, Enrolled Students.
+        *   **Response:** Array of assignment objects.
+    *   **`POST /courses/<course_id>/assignments/`**: Create a new assignment for a course.
+        *   **Access:** Course Teacher only.
+        *   **Request Body (JSON):** `title`, `description` (optional), `deadline` (ISO 8601), `total_score` (optional, default 100).
+        *   **Response (201 Created):** Newly created assignment object.
+    *   **`GET /assignments/<assignment_id>`**: Get details of a specific assignment.
+        *   **Access:** Course Teacher, Enrolled Students (in the course of the assignment).
+        *   **Response:** Assignment object.
+
+*   **Submissions (JWT required for all):**
+    *   **`POST /assignments/<assignment_id>/submissions`**: Submit to an assignment.
+        *   **Access:** Enrolled Student in the course of the assignment.
+        *   **Request Body (JSON):** `content`, `attachment_url` (optional).
+        *   **Response (201 Created):** Newly created submission object.
+        *   **Notes:** Checks for deadlines and prevents duplicate submissions.
+    *   **`GET /assignments/<assignment_id>/submissions`**: List all submissions for a specific assignment.
+        *   **Access:** Course Teacher only.
+        *   **Response:** Array of submission objects.
+    *   **`GET /submissions/<submission_id>`**: Get details of a specific submission.
+        *   **Access:** Submitting Student or Course Teacher.
+        *   **Response:** Submission object.
+    *   **`PUT /submissions/<submission_id>/grade`**: Grade a submission.
+        *   **Access:** Course Teacher only.
+        *   **Request Body (JSON):** `score` (integer), `feedback` (optional string).
+        *   **Response (200 OK):** Updated submission object with grade.
+
+*(Note: If a global API prefix like `/api` is configured in Flask-RESTx, these paths would be, for example, `/api/courses/<course_id>/assignments/`.)*
 
 ## Technology Stack
 

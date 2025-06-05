@@ -58,7 +58,12 @@ def create_app():
     from .course_api import course_ns
     api.add_namespace(course_ns, path='/courses')
 
-    # Placeholder for other future namespaces (e.g., enrollment, assignments etc.)
+    from .assignment_api import course_assignments_ns, assignment_ops_ns, submission_ops_ns
+    api.add_namespace(course_assignments_ns) # Path: /courses/<int:course_id>/assignments
+    api.add_namespace(assignment_ops_ns)     # Path: /assignments
+    api.add_namespace(submission_ops_ns)     # Path: /submissions
+
+    # Placeholder for other future namespaces (e.g., enrollment etc.)
 
     # --- CLI Commands ---
     @app.cli.command("init-db")
