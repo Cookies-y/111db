@@ -76,6 +76,9 @@ def create_app():
     api.add_namespace(material_progress_ns)  # Path: /materials/<int:material_id>/progress
     api.add_namespace(course_progress_ns)    # Path: /courses/<int:course_id>/my-material-progress
 
+    from .admin_api import admin_ns
+    api.add_namespace(admin_ns)              # Path: /admin
+
     # Placeholder for other future namespaces (e.g., enrollment etc.)
 
     # --- CLI Commands ---

@@ -274,6 +274,20 @@ You can also test endpoints using tools like Postman or `curl`.
         *   **Access:** Enrolled Student.
         *   **Response (200 OK):** List of material progress details for the specified course.
 
+**Administrator Endpoints (base path: `/admin`, JWT and Admin Role required for all):**
+
+*   **User Management (Admin):**
+    *   **`GET /admin/users`**: List all users in the system.
+        *   **Response:** Array of user objects with detailed information.
+    *   **`GET /admin/users/<user_id>`**: Get details of a specific user.
+        *   **Response:** Detailed user object.
+
+*   **Course Management (Admin):**
+    *   **`GET /admin/courses`**: List all courses in the system.
+        *   **Response:** Array of course objects (summary view, similar to public course list but potentially with more admin-relevant info if DTOs differ).
+    *   **`GET /admin/courses/<course_id>`**: Get details of a specific course, including its chapters, materials, etc.
+        *   **Response:** Detailed course object.
+
 *(Note: If a global API prefix like `/api` is configured in Flask-RESTx, these paths would be, for example, `/api/courses/<course_id>/assignments/`.)*
 
 ## Technology Stack
