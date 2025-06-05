@@ -1,53 +1,115 @@
 import os
 from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
-from flask_login import LoginManager
+from flask_restx import Api
+from flask_bcrypt import Bcrypt
+from flask_jwt_extended import JWTManager
+from datetime import timedelta
+import click # For CLI commands
 
+# Initialize extensions
 db = SQLAlchemy()
-login_manager = LoginManager()
+bcrypt = Bcrypt()
+jwt = JWTManager()
+
+authorizations = {
+    'jsonWebToken': {
+        'type': 'apiKey',
+        'in': 'header',
+        'name': 'Authorization',
+        'description': "Type in the *'Value'* input box below: **'Bearer &lt;JWT&gt;'**, where JWT is the token"
+    }
+}
+
+api = Api(
+    version='1.0',
+    title='XueTong API',
+    description='A RESTful API for the XueTong Online Learning Platform (MVP)',
+    authorizations=authorizations
+)
 
 def create_app():
     app = Flask(__name__)
 
     # Configuration
-    app.config['SECRET_KEY'] = 'dev_secret_key_for_xuetong_system' # Replace with a real secret key in production
-    # Construct the absolute path for the SQLite database
+    app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev_secret_key_placeholder')
+
     instance_path = os.path.join(os.path.abspath(os.path.dirname(os.path.dirname(__file__))), 'instance')
     if not os.path.exists(instance_path):
         os.makedirs(instance_path)
     app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{os.path.join(instance_path, "xuetong.sqlite3")}'
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
-    # Initialize extensions
+    app.config['JWT_SECRET_KEY'] = os.environ.get('JWT_SECRET_KEY', 'super-secret-jwt-key-placeholder')
+    app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(hours=1)
+
+    # Initialize extensions with the app
     db.init_app(app)
-    login_manager.init_app(app)
-    login_manager.login_view = 'auth.login' # Define where to redirect for login
+    bcrypt.init_app(app)
+    jwt.init_app(app)
+    api.init_app(app)
 
-    # User loader for Flask-Login
-    from .models import User # Import here to avoid circular dependency
-    @login_manager.user_loader
-    def load_user(user_id):
-        return User.query.get(int(user_id))
+    from . import models # Import models to register them with SQLAlchemy
 
-    # Import blueprints
-    from .auth_routes import auth_bp
-    app.register_blueprint(auth_bp, url_prefix='/auth')
+    # Register API namespaces
+    from .auth_api import auth_ns
+    api.add_namespace(auth_ns, path='/auth')
 
-    from .main_routes import main_bp
-    app.register_blueprint(main_bp) # No URL prefix for main routes
+    # Placeholder for other future namespaces
 
-
-    # Function to create database tables
-    def create_db_tables():
-        with app.app_context():
-            from .models import User, Course # Ensure models are imported within context
+    # --- CLI Commands ---
+    @app.cli.command("init-db")
+    def init_db_command():
+        """Creates or updates the database tables based on models."""
+        with app.app_context(): # Ensure app context for db operations
             db.create_all()
-            print("Database tables created (if they didn't exist).")
+        click.echo(click.style("Initialized/Updated the database!", fg='green'))
 
-    # You might want to call create_db_tables() conditionally,
-    # e.g., via a CLI command or only if the db file doesn't exist.
-    # For now, it's a callable function.
-    app.extensions['create_db_tables'] = create_db_tables
+    @app.cli.command("create-admin")
+    @click.option('--username', required=True, help='Admin username')
+    @click.option('--email', required=True, help='Admin email address')
+    @click.option('--password', required=True, help='Admin password (will be hashed)')
+    @click.option('--real_name', required=True, help='Admin real name')
+    def create_admin_command(username, email, password, real_name):
+        """Creates a new admin user (user_type=3)."""
+        # App context is usually available in CLI commands registered this way,
+        # but explicit context can be added if issues arise.
+        # from .models import User # Already imported via `from . import models`
+
+        # It's better to ensure User is loaded within the app context for DB operations
+        with app.app_context():
+            if models.User.query.filter_by(email=email).first():
+                click.echo(click.style(f'Error: User with email {email} already exists.', fg='red'))
+                return
+            if models.User.query.filter_by(username=username).first():
+                click.echo(click.style(f'Error: User with username {username} already exists.', fg='red'))
+                return
+
+            hashed_password = bcrypt.generate_password_hash(password).decode('utf-8')
+            admin_user = models.User(
+                username=username,
+                email=email,
+                password_hash=hashed_password,
+                real_name=real_name,
+                user_type=3  # 3 for admin
+            )
+            db.session.add(admin_user)
+            try:
+                db.session.commit()
+                click.echo(click.style(f'Admin user {username} created successfully with email {email}.', fg='green'))
+            except Exception as e:
+                db.session.rollback()
+                click.echo(click.style(f'Error creating admin: {str(e)}', fg='red'))
+                app.logger.error(f"Error creating admin: {e}")
+
+
+    # The old create_db_tables function exposed via app.extensions is no longer needed
+    # if init-db CLI command is preferred. Keeping it doesn't harm for now.
+    def create_db_tables_old_method(): # Renamed to avoid confusion
+        with app.app_context():
+            db.create_all()
+            print("Database tables checked/created (if they didn't exist) via old method.")
+    app.extensions['create_db_tables'] = create_db_tables_old_method
 
 
     return app

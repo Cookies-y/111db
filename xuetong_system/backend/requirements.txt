@@ -1,6 +1,8 @@
-Flask
-Flask-SQLAlchemy
-Flask-Login
-Flask-WTF
-Werkzeug
 email-validator
+Flask
+Flask-Bcrypt
+Flask-JWT-Extended
+Flask-RESTx
+Flask-SQLAlchemy
+PyJWT
+Werkzeug
