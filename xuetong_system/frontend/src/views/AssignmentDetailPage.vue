@@ -157,17 +157,17 @@
 <script setup>
 import { ref, reactive, computed, onMounted, onUnmounted, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { useAuthStore } from '../../stores/authStore';
-import { useAssignmentStore } from '../../stores/assignmentStore';
-import { ElMessage, ElMessageBox } from 'element-plus'; // ElMessageBox for confirm dialog
-import { ArrowRight, User, Calendar, Clock, Document as DocIcon, VideoCamera, Link as LinkIconElem } from '@element-plus/icons-vue'; // Renamed Link to LinkIconElem
+import { useAuthStore } from '../stores/authStore'; // Corrected path
+import { useAssignmentStore } from '../stores/assignmentStore'; // Corrected path
+import { ElMessage, ElDialog, ElDescriptions, ElDescriptionsItem } from 'element-plus'; // Added ElDialog, ElDescriptions, ElDescriptionsItem
+import { ArrowRight, User, Calendar, Clock, Document as DocIcon, VideoCamera, Link as LinkIconElem, EditPen } from '@element-plus/icons-vue'; // Renamed Link to LinkIconElem, Added EditPen
 
 const route = useRoute();
 const router = useRouter();
 const authStore = useAuthStore();
 const assignmentStore = useAssignmentStore();
 
-const assignmentId = computed(() => parseInt(route.params.id, 10));
+const assignmentId = computed(() => parseInt(route.params.id));
 const assignment = computed(() => assignmentStore.getAssignmentDetails);
 const submissions = computed(() => assignmentStore.getSubmissions);
 

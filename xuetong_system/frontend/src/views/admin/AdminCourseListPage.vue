@@ -60,7 +60,7 @@
 
 <script setup>
 import { computed, onMounted } from 'vue';
-import { useAdminStore } from '../../../stores/adminStore'; // Adjusted path
+import { useAdminStore } from '../../stores/adminStore'; // Corrected path
 import { ElTable, ElTableColumn, ElButton, ElTag, ElCard, ElSkeleton, ElAlert, ElEmpty, ElBreadcrumb, ElBreadcrumbItem, ElIcon } from 'element-plus';
 import { View, ArrowRight } from '@element-plus/icons-vue';
 

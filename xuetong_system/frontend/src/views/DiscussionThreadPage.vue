@@ -93,8 +93,8 @@
 <script setup>
 import { ref, reactive, computed, onMounted, onUnmounted, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { useAuthStore } from '../../stores/authStore';
-import { useDiscussionStore } from '../../stores/discussionStore';
+import { useAuthStore } from '../stores/authStore'; // Corrected path
+import { useDiscussionStore } from '../stores/discussionStore'; // Corrected path
 import { ElMessage } from 'element-plus';
 import { ArrowRight, User, ChatLineRound } from '@element-plus/icons-vue'; // Import necessary icons
 

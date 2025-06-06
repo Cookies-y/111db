@@ -53,7 +53,7 @@
 
 <script setup>
 import { ref, reactive, onUnmounted } from 'vue';
-import { useAuthStore } from '../../stores/authStore';
+import { useAuthStore } from '../stores/authStore'; // Corrected path
 // import { ElMessage } from 'element-plus'; // Can be used for alternative error display
 
 const authStore = useAuthStore();

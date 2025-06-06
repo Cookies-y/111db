@@ -144,9 +144,9 @@
 <script setup>
 import { ref, reactive, computed, onMounted, onUnmounted, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { useAuthStore } from '../../stores/authStore';
-import { useExamStore } from '../../stores/examStore';
-import { ElMessage, ElDialog, ElDescriptions, ElDescriptionsItem } from 'element-plus'; // Added ElDialog, ElDescriptions, ElDescriptionsItem
+import { useAuthStore } from '../stores/authStore'; // Corrected path
+import { useExamStore } from '../stores/examStore'; // Corrected path
+import { ElMessage, ElDialog, ElDescriptions, ElDescriptionsItem } from 'element-plus';
 import { ArrowRight, User, Calendar, Clock, StarFilled, EditPen } from '@element-plus/icons-vue';
 
 const route = useRoute();

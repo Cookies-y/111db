@@ -55,7 +55,7 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
 import { useRoute } from 'vue-router';
-import { useAdminStore } from '../../../stores/adminStore'; // Adjusted path
+import { useAdminStore } from '../../stores/adminStore'; // Corrected path
 import {
     ElCard, ElDescriptions, ElDescriptionsItem, ElTag, ElSkeleton,
     ElAlert, ElEmpty, ElBreadcrumb, ElBreadcrumbItem, ElButton, ElIcon

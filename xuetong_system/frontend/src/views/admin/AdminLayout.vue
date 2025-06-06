@@ -65,7 +65,7 @@
 <script setup>
 import { computed } from 'vue';
 import { useRoute, useRouter, RouterView } from 'vue-router'; // RouterView needs to be imported
-import { useAuthStore } from '../../../stores/authStore'; // Adjusted path
+import { useAuthStore } from '../../stores/authStore'; // Corrected path
 import {
     ElContainer, ElAside, ElMenu, ElMenuItem, ElIcon, ElMain, ElHeader,
     ElDropdown, ElDropdownMenu, ElDropdownItem

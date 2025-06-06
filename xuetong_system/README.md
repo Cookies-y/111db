@@ -15,9 +15,12 @@ This is the backend API for the XueTong System, an online learning platform. Thi
     *   JWT-based authentication for securing API endpoints.
 *   **API Endpoints:**
     *   A protected test endpoint (`/auth/protected`) to verify JWT authentication.
+    *   Admin-specific endpoints for user and course management.
+    *   Endpoints for course, assignment, exam, discussion, and progress management.
 *   **Command-Line Interface (CLI) Utilities:**
     *   `flask init-db`: A command to initialize the database, creating all tables based on the defined models.
     *   `flask create-admin`: A command to create an initial administrator user with specified credentials.
+*   **Configuration:** Environment-based configurations for development, production, and testing.
 
 ## Project Structure
 
@@ -26,14 +29,22 @@ The project is primarily contained within the `xuetong_system/` directory:
 *   `backend/`: Contains the Flask application and all related files.
     *   `app/`: The core application package.
         *   `models.py`: Defines all 11 SQLAlchemy database models.
-        *   `auth_api.py`: Defines API routes and logic for authentication (registration, login) and user-related operations using Flask-RESTx.
+        *   `auth_api.py`, `course_api.py`, `assignment_api.py`, `exam_api.py`, `discussion_api.py`, `progress_api.py`, `admin_api.py`: Define API routes and logic using Flask-RESTx.
         *   `__init__.py`: Initializes the Flask application, extensions (SQLAlchemy, Bcrypt, JWTManager, Flask-RESTx API), and registers API namespaces and CLI commands.
-        *   *(Note: `templates/`, `static/`, and `forms.py` have been removed as part of the shift to a pure API backend.)*
-    *   `instance/`: This directory is created automatically. The SQLite database file (`xuetong.sqlite3`) will be stored here.
-    *   `venv/`: The Python virtual environment directory (should be created by the user).
-    *   `run.py`: A Python script used to start the Flask development API server.
+    *   `instance/`: This directory is created by `config.py` if it doesn't exist. SQLite database files (e.g., `xuetong_dev.sqlite3`, `xuetong_prod.sqlite3`) will be stored here.
+    *   `venv/`: The Python virtual environment directory (created by the user).
+    *   `run.py`: Script to start the Flask development API server using development configuration.
+    *   `wsgi.py`: WSGI entry point for production deployment (e.g., with Gunicorn).
+    *   `config.py`: Contains configuration classes for different environments.
     *   `requirements.txt`: Lists the Python dependencies for the project.
-*   `.gitignore`: Specifies intentionally untracked files that Git should ignore.
+*   `frontend/`: Contains the Vue.js frontend application.
+    *   `src/`: Frontend source code (components, views, stores, router, services).
+    *   `dist/`: (Generated after build) Contains optimized static assets for deployment.
+    *   `.env.development`, `.env.production`: Environment-specific configurations for the frontend (e.g., API base URL).
+    *   `package.json`: Frontend project metadata and dependencies.
+    *   `vite.config.js`: Vite build tool configuration.
+*   `.gitignore`: Specifies intentionally untracked files that Git should ignore (at the root of `xuetong_system/`).
+*   `xuetong_system/frontend/.gitignore`: Specific ignores for the frontend project (e.g., `node_modules`, `dist`).
 *   `README.md`: This file.
 
 ## Setup Instructions
@@ -41,81 +52,134 @@ The project is primarily contained within the `xuetong_system/` directory:
 1.  **Clone the Repository:**
     If you have Git, clone the repository. Otherwise, ensure you have the `xuetong_system` directory structure.
 
-2.  **Navigate to Backend Directory:**
-    Open your terminal and navigate into the backend directory:
-    ```bash
-    cd path/to/xuetong_system/backend/
-    ```
-
-3.  **Create and Activate Virtual Environment:**
-    It's highly recommended to use a virtual environment to manage project dependencies.
-    ```bash
-    # Create the virtual environment
-    python -m venv venv
-    ```
-    Activate the virtual environment:
-    *   On Windows:
+2.  **Backend Setup (in `xuetong_system/backend/`):**
+    *   Navigate to the backend directory: `cd path/to/xuetong_system/backend/`
+    *   Create and activate a Python virtual environment:
         ```bash
-        .\venv\Scripts\activate
+        python -m venv venv
+        # On Windows: .\venv\Scripts\activate
+        # On macOS/Linux: source venv/bin/activate
         ```
-    *   On macOS/Linux:
-        ```bash
-        source venv/bin/activate
-        ```
-    Your terminal prompt should change to indicate that the virtual environment is active.
+    *   Install backend dependencies: `pip install -r requirements.txt`
 
-4.  **Install Dependencies:**
-    With the virtual environment activated, install the required Python packages:
-    ```bash
-    pip install -r requirements.txt
-    ```
-    This will install Flask, Flask-RESTx, Flask-SQLAlchemy, Flask-JWT-Extended, Flask-Bcrypt, and other necessary packages.
+3.  **Frontend Setup (in `xuetong_system/frontend/`):**
+    *   Navigate to the frontend directory: `cd path/to/xuetong_system/frontend/`
+    *   Install frontend dependencies: `npm install` (or `yarn install` / `pnpm install`)
 
-## Running the API Application
+## Running the Application (Development)
 
-1.  **Ensure Location and Environment:**
-    Make sure you are still in the `xuetong_system/backend/` directory and that your virtual environment (`venv`) is activated.
-
-2.  **Set Flask App Environment Variable (Optional but Recommended):**
-    For Flask CLI commands to work smoothly, you might need to set the `FLASK_APP` environment variable.
-    *   On macOS/Linux:
+1.  **Start Backend API Server:**
+    *   Ensure you are in `xuetong_system/backend/` with the virtual environment activated.
+    *   Set environment variables (e.g., in a `.flaskenv` file or directly):
         ```bash
         export FLASK_APP=run.py
+        export FLASK_CONFIG=development
+        # Optionally set DEV_DATABASE_URL, SECRET_KEY, JWT_SECRET_KEY if not using defaults from config.py
         ```
-    *   On Windows (cmd.exe):
+    *   Initialize the database (if first time or after model changes): `flask init-db`
+    *   Create an admin user (recommended): `flask create-admin --username youradmin --email admin@example.com --password yourpass --real_name "Admin User"`
+    *   Run the development server: `python run.py` or `flask run`
+    *   The API server will typically run on `http://localhost:5001/`. Swagger UI for API docs will be at `http://localhost:5001/doc/`.
+
+2.  **Start Frontend Development Server:**
+    *   Ensure you are in `xuetong_system/frontend/`.
+    *   (The `frontend/.env.development` file should set `VITE_API_BASE_URL=http://localhost:5001`.)
+    *   Run the Vite development server: `npm run dev`
+    *   The frontend will typically be available at `http://localhost:5173` (or another port shown in the console).
+
+## Deployment Preparation
+
+This section outlines key considerations for preparing the application for a production environment.
+
+### Backend (Flask API)
+
+*   **Configuration (`config.py`):**
+    *   The `config.py` file manages different configurations (e.g., `DevelopmentConfig`, `ProductionConfig`).
+    *   The `FLASK_CONFIG` environment variable (e.g., `export FLASK_CONFIG=production`) is used by `wsgi.py` (for production) and `run.py` (can be set for dev) to select the appropriate configuration class.
+*   **Required Environment Variables for Production:**
+    *   `FLASK_CONFIG=production`: Ensures production settings are loaded.
+    *   `SECRET_KEY`: A strong, unique secret key for Flask session security, CSRF, etc. **Must be changed from default.**
+    *   `JWT_SECRET_KEY`: A strong, unique secret key for signing JWTs. **Must be changed from default.**
+    *   `DATABASE_URL`: The full database connection string for your production database (e.g., `postgresql://user:password@host:port/dbname`). The default `ProductionConfig` uses `sqlite:///instance/xuetong_prod.sqlite3` if `DATABASE_URL` is not set.
+*   **Database Initialization (Production):**
+    *   After setting up your production environment and configuration (especially `DATABASE_URL` and `FLASK_CONFIG=production`), run the database initialization command from your `backend` directory (with virtualenv activated):
         ```bash
-        set FLASK_APP=run.py
+        flask init-db
         ```
-    *   On Windows (PowerShell):
+    *   Similarly, create an initial admin user using `flask create-admin ...` if needed for the production database.
+*   **Running with Gunicorn (Production WSGI Server):**
+    *   The `wsgi.py` file provides the `application` callable for WSGI servers.
+    *   Gunicorn is listed in `requirements.txt`.
+    *   Example command to run the backend with Gunicorn:
         ```bash
-        $env:FLASK_APP = "run.py"
+        # Ensure backend virtual environment is active
+        # Ensure all production environment variables (FLASK_CONFIG, SECRET_KEY, etc.) are set
+        cd /path/to/xuetong_system/backend/
+        gunicorn --workers 4 --bind 0.0.0.0:5000 wsgi:application
         ```
-    Alternatively, you can invoke Flask directly: `python -m flask <command>`.
+    *   `--workers 4`: Example number of worker processes (adjust based on your server's CPU cores).
+    *   `--bind 0.0.0.0:5000`: Makes Gunicorn listen on port 5000 on all network interfaces. This port is typically proxied by a web server like Nginx.
 
-3.  **Initialize the Database:**
-    Before running the application for the first time, or if you've made changes to the models, initialize the database:
-    ```bash
-    flask init-db
-    ```
-    This command creates all necessary tables in the `instance/xuetong.sqlite3` database file.
+### Frontend (Vue.js SPA)
 
-4.  **Create an Admin User (Recommended):**
-    Use the CLI command to create an initial admin user:
-    ```bash
-    flask create-admin --username youradmin --email admin@example.com --password yoursecurepassword --real_name "Admin User"
-    ```
-    Replace placeholders with your desired admin credentials.
+*   **API Base URL Configuration:**
+    *   The frontend connects to the backend API using a base URL defined by an environment variable.
+    *   For development, `frontend/.env.development` sets `VITE_API_BASE_URL=http://localhost:5001` (or your backend dev port).
+    *   For production, `frontend/.env.production` should be configured. Examples:
+        *   `VITE_API_BASE_URL=/api`: If Nginx (or another reverse proxy) serves the frontend and proxies requests from `/api` on the same domain to the backend API (e.g., Gunicorn on port 5000).
+        *   `VITE_API_BASE_URL=https://api.yourdomain.com`: If your API is hosted on a separate subdomain.
+*   **Building for Production:**
+    *   Navigate to the frontend directory: `cd path/to/xuetong_system/frontend/`
+    *   Run the build command: `npm run build`
+    *   This generates optimized static assets (HTML, CSS, JavaScript) in the `frontend/dist/` directory. These are the files you will deploy.
 
-5.  **Run the Development API Server:**
-    Execute the `run.py` script:
-    ```bash
-    python run.py
+### Serving in Production (Conceptual Example with Nginx)
+
+A common production setup involves using a web server like Nginx to serve the static frontend files and act as a reverse proxy for the backend API (Gunicorn).
+
+*   **Nginx Configuration Snippet (Illustrative):**
+    ```nginx
+    # /etc/nginx/sites-available/your_xuetong_site.conf
+    server {
+        listen 80; # Or 443 for HTTPS with SSL configuration
+        server_name yourdomain.com; # Replace with your actual domain
+
+        # Vue.js frontend static files (from frontend/dist/)
+        location / {
+            root /var/www/xuetong_system/frontend/dist; # Adjust path to your deployment
+            try_files $uri $uri/ /index.html;
+            # Add caching headers, security headers, etc.
+        }
+
+        # Reverse proxy API requests to the backend Flask/Gunicorn server
+        # This path must match the VITE_API_BASE_URL if it's a relative path (e.g., /api)
+        location /api/ {
+            # If VITE_API_BASE_URL in frontend is just '/',
+            # then proxy all non-static locations:
+            # location ~ ^/(auth|courses|assignments|exams|discussions|progress|admin)/ { ... }
+
+            proxy_pass http://127.0.0.1:5000; # Gunicorn running on port 5000
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            # Optional: Increase client body size if handling large file uploads via API
+            # client_max_body_size 20M;
+        }
+
+        # SSL Configuration (Highly Recommended for Production)
+        # listen 443 ssl;
+        # ssl_certificate /path/to/your/fullchain.pem;
+        # ssl_certificate_key /path/to/your/privkey.pem;
+        # include /etc/letsencrypt/options-ssl-nginx.conf; # Example for Let's Encrypt
+        # ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem;   # Example for Let's Encrypt
+    }
     ```
-    The API server will start, typically available at `http://127.0.0.1:5001/`. This backend serves API endpoints; there is no browser UI directly served by this application.
+*   **Important:** This Nginx example is conceptual. A production setup requires careful configuration, including SSL/TLS for HTTPS, security headers, logging, and performance tuning.
 
 ## API Endpoints Overview
 
-The API is organized using Flask-RESTx. Interactive API documentation via Swagger UI is typically available at the root URL of the API (e.g., `http://127.0.0.1:5001/`) when the development server is running.
+The API is organized using Flask-RESTx. Interactive API documentation via Swagger UI is typically available at `/doc/` relative to the API root (e.g., `http://localhost:5001/doc/`) when the development server is running.
 
 You can also test endpoints using tools like Postman or `curl`.
 
@@ -288,7 +352,7 @@ You can also test endpoints using tools like Postman or `curl`.
     *   **`GET /admin/courses/<course_id>`**: Get details of a specific course, including its chapters, materials, etc.
         *   **Response:** Detailed course object.
 
-*(Note: If a global API prefix like `/api` is configured in Flask-RESTx, these paths would be, for example, `/api/courses/<course_id>/assignments/`.)*
+*(Note: The base path for all API endpoints (e.g., `/auth`, `/courses`) is relative to where the Flask application is served. If Nginx proxies `/api/` to the Flask app, then frontend's `VITE_API_BASE_URL` would be `/api`, and actual request paths would be `/api/auth/login`, etc. The Swagger UI is available at `/doc/`.)*
 
 ## Technology Stack
 
@@ -301,6 +365,7 @@ You can also test endpoints using tools like Postman or `curl`.
 *   **Data Validation:** `email-validator` (for email format validation in models/logic, if used beyond WTForms)
 *   **CLI:** Click (Flask's default CLI library)
 *   **WSGI Server (Flask dev server):** Werkzeug
+*   **Production WSGI Server:** Gunicorn
 
 ---
 This README provides guidance for setting up, running, and interacting with the XueTong System API backend.

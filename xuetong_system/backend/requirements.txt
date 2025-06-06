@@ -4,5 +4,6 @@ Flask-Bcrypt
 Flask-JWT-Extended
 Flask-RESTx
 Flask-SQLAlchemy
+gunicorn
 PyJWT
 Werkzeug

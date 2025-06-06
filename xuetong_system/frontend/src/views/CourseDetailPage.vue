@@ -177,9 +177,9 @@
 <script setup>
 import { computed, onMounted, onUnmounted, watch } from 'vue';
 import { useRoute } from 'vue-router';
-import { useCourseStore } from '../../stores/courseStore';
-import { useAuthStore } from '../../stores/authStore';
-import { useProgressStore } from '../../stores/progressStore'; // Import progress store
+import { useCourseStore } from '../stores/courseStore'; // Corrected path
+import { useAuthStore } from '../stores/authStore';  // Corrected path
+import { useProgressStore } from '../stores/progressStore'; // Corrected path
 import {
     ElCard, ElRow, ElCol, ElSkeleton, ElEmpty, ElTag, ElDivider,
     ElIcon, ElLink, ElBreadcrumb, ElBreadcrumbItem, ElAlert, ElImage,

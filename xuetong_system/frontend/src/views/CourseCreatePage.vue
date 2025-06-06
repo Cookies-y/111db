@@ -109,8 +109,8 @@
 
 <script setup>
 import { ref, reactive, onUnmounted, computed } from 'vue';
-import { useCourseStore } from '../../stores/courseStore';
-import { useAuthStore } from '../../stores/authStore';
+import { useCourseStore } from '../stores/courseStore'; // Corrected path
+import { useAuthStore } from '../stores/authStore'; // Corrected path
 import { useRouter } from 'vue-router';
 import { ElMessage } from 'element-plus'; // For success/error notifications
 

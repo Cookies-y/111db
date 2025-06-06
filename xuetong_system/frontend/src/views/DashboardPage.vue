@@ -91,8 +91,8 @@
 
 <script setup>
 import { onMounted, computed } from 'vue';
-import { useAuthStore } from '../../stores/authStore';
-import { useCourseStore } from '../../stores/courseStore';
+import { useAuthStore } from '../stores/authStore'; // Corrected path
+import { useCourseStore } from '../stores/courseStore'; // Corrected path
 import { ElCard, ElRow, ElCol, ElSkeleton, ElEmpty, ElButton, ElTag, ElAlert, ElImage } from 'element-plus';
 import { Plus } from '@element-plus/icons-vue'; // For the create course button icon
 

@@ -5,9 +5,12 @@ from flask_restx import Api
 from flask_bcrypt import Bcrypt
 from flask_jwt_extended import JWTManager
 from datetime import timedelta
-import click # For CLI commands
+import click
 
-# Initialize extensions
+# Import the configuration dictionary
+from ..config import config # `config.py` is in parent directory `backend/`
+
+# Initialize extensions (globally, to be initialized with app in create_app)
 db = SQLAlchemy()
 bcrypt = Bcrypt()
 jwt = JWTManager()
@@ -21,37 +24,30 @@ authorizations = {
     }
 }
 
+# Global Api object. Namespaces will be added in create_app, then api initialized with app.
 api = Api(
     version='1.0',
     title='XueTong API',
     description='A RESTful API for the XueTong Online Learning Platform (MVP)',
-    authorizations=authorizations
+    authorizations=authorizations,
+    doc='/doc/' # Optional: Serve Swagger UI at /doc/ instead of root
 )
 
-def create_app():
-    app = Flask(__name__)
+def create_app(config_name='default'): # Add config_name parameter
+    app = Flask(__name__) # Flask's default instance_path is fine if SQLALCHEMY_DATABASE_URI is absolute
 
-    # Configuration
-    app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev_secret_key_placeholder')
-
-    instance_path = os.path.join(os.path.abspath(os.path.dirname(os.path.dirname(__file__))), 'instance')
-    if not os.path.exists(instance_path):
-        os.makedirs(instance_path)
-    app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{os.path.join(instance_path, "xuetong.sqlite3")}'
-    app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-
-    app.config['JWT_SECRET_KEY'] = os.environ.get('JWT_SECRET_KEY', 'super-secret-jwt-key-placeholder')
-    app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(hours=1)
+    # Load configuration from config.py
+    app.config.from_object(config[config_name])
 
     # Initialize extensions with the app
     db.init_app(app)
     bcrypt.init_app(app)
     jwt.init_app(app)
-    api.init_app(app)
+    # Note: api.init_app(app) will be called after namespaces are added to the api object
 
     from . import models # Import models to register them with SQLAlchemy
 
-    # Register API namespaces
+    # Register API namespaces to the global 'api' object
     from .auth_api import auth_ns
     api.add_namespace(auth_ns, path='/auth')
 
@@ -59,33 +55,35 @@ def create_app():
     api.add_namespace(course_ns, path='/courses')
 
     from .assignment_api import course_assignments_ns, assignment_ops_ns, submission_ops_ns
-    api.add_namespace(course_assignments_ns) # Path: /courses/<int:course_id>/assignments
-    api.add_namespace(assignment_ops_ns)     # Path: /assignments
-    api.add_namespace(submission_ops_ns)     # Path: /submissions
+    api.add_namespace(course_assignments_ns)
+    api.add_namespace(assignment_ops_ns)
+    api.add_namespace(submission_ops_ns)
 
     from .exam_api import course_exams_ns, exam_ops_ns, exam_result_ops_ns
-    api.add_namespace(course_exams_ns)       # Path: /courses/<int:course_id>/exams
-    api.add_namespace(exam_ops_ns)           # Path: /exams/<int:exam_id>
-    api.add_namespace(exam_result_ops_ns)    # Path: /exam-results
+    api.add_namespace(course_exams_ns)
+    api.add_namespace(exam_ops_ns)
+    api.add_namespace(exam_result_ops_ns)
 
     from .discussion_api import course_discussions_ns, discussion_ops_ns
-    api.add_namespace(course_discussions_ns) # Path: /courses/<int:course_id>/discussions
-    api.add_namespace(discussion_ops_ns)     # Path: /discussions
+    api.add_namespace(course_discussions_ns)
+    api.add_namespace(discussion_ops_ns)
 
     from .progress_api import material_progress_ns, course_progress_ns
-    api.add_namespace(material_progress_ns)  # Path: /materials/<int:material_id>/progress
-    api.add_namespace(course_progress_ns)    # Path: /courses/<int:course_id>/my-material-progress
+    api.add_namespace(material_progress_ns)
+    api.add_namespace(course_progress_ns)
 
     from .admin_api import admin_ns
-    api.add_namespace(admin_ns)              # Path: /admin
+    api.add_namespace(admin_ns)
 
-    # Placeholder for other future namespaces (e.g., enrollment etc.)
+    # Now that all namespaces are added to the global 'api' object, initialize it with the app
+    api.init_app(app)
+
 
     # --- CLI Commands ---
     @app.cli.command("init-db")
     def init_db_command():
         """Creates or updates the database tables based on models."""
-        with app.app_context(): # Ensure app context for db operations
+        with app.app_context():
             db.create_all()
         click.echo(click.style("Initialized/Updated the database!", fg='green'))
 
@@ -96,11 +94,6 @@ def create_app():
     @click.option('--real_name', required=True, help='Admin real name')
     def create_admin_command(username, email, password, real_name):
         """Creates a new admin user (user_type=3)."""
-        # App context is usually available in CLI commands registered this way,
-        # but explicit context can be added if issues arise.
-        # from .models import User # Already imported via `from . import models`
-
-        # It's better to ensure User is loaded within the app context for DB operations
         with app.app_context():
             if models.User.query.filter_by(email=email).first():
                 click.echo(click.style(f'Error: User with email {email} already exists.', fg='red'))
@@ -109,6 +102,7 @@ def create_app():
                 click.echo(click.style(f'Error: User with username {username} already exists.', fg='red'))
                 return
 
+            # Use bcrypt from the initialized extension
             hashed_password = bcrypt.generate_password_hash(password).decode('utf-8')
             admin_user = models.User(
                 username=username,
@@ -126,14 +120,7 @@ def create_app():
                 click.echo(click.style(f'Error creating admin: {str(e)}', fg='red'))
                 app.logger.error(f"Error creating admin: {e}")
 
-
-    # The old create_db_tables function exposed via app.extensions is no longer needed
-    # if init-db CLI command is preferred. Keeping it doesn't harm for now.
-    def create_db_tables_old_method(): # Renamed to avoid confusion
-        with app.app_context():
-            db.create_all()
-            print("Database tables checked/created (if they didn't exist) via old method.")
-    app.extensions['create_db_tables'] = create_db_tables_old_method
-
+    # Removed the old create_db_tables function exposed via app.extensions,
+    # as init-db CLI command is the standard way now.
 
     return app

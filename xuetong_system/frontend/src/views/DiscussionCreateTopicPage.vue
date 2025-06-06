@@ -76,8 +76,8 @@
 
 <script setup>
 import { ref, reactive, onMounted, onUnmounted, computed } from 'vue';
-import { useCourseStore } from '../../stores/courseStore';
-import { useAuthStore } from '../../stores/authStore'; // To ensure user is authenticated
+import { useCourseStore } from '../stores/courseStore'; // Corrected path
+import { useAuthStore } from '../stores/authStore'; // Corrected path
 import { useRouter, useRoute } from 'vue-router';
 import { ElMessage } from 'element-plus';
 import { ArrowRight } from '@element-plus/icons-vue';
