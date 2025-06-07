@@ -109,16 +109,48 @@ This section outlines key considerations for preparing the application for a pro
     *   Similarly, create an initial admin user using `flask create-admin ...` if needed for the production database.
 *   **Running with Gunicorn (Production WSGI Server):**
     *   The `wsgi.py` file provides the `application` callable for WSGI servers.
-    *   Gunicorn is listed in `requirements.txt`.
-    *   Example command to run the backend with Gunicorn:
+    *   The `wsgi.py` file provides the `application` callable for WSGI servers.
+
+        ##### Waitress (Recommended for Windows)
+
+        Waitress is a production-quality WSGI server that runs on Windows. It's listed in `requirements.txt`.
+
+        Ensure your backend virtual environment is active and all production environment variables are set (see above, and notes on setting them for Windows below). Run Waitress using:
+
+        ```bash
+        cd path/to/xuetong_system/backend/
+        waitress-serve --host 0.0.0.0 --port 5000 wsgi:application
+        ```
+        *   `wsgi:application` refers to the `application` object in your `wsgi.py` file.
+        *   `--host 0.0.0.0` makes the server accessible on your network.
+        *   `--port 5000` is an example port; ensure it's open and not conflicting. Use the same port your reverse proxy (like Nginx or IIS) expects.
+
+        ##### Gunicorn (Recommended for Linux/macOS)
+
+        Gunicorn is listed in `requirements.txt`. Example command:
         ```bash
         # Ensure backend virtual environment is active
         # Ensure all production environment variables (FLASK_CONFIG, SECRET_KEY, etc.) are set
         cd /path/to/xuetong_system/backend/
         gunicorn --workers 4 --bind 0.0.0.0:5000 wsgi:application
         ```
-    *   `--workers 4`: Example number of worker processes (adjust based on your server's CPU cores).
-    *   `--bind 0.0.0.0:5000`: Makes Gunicorn listen on port 5000 on all network interfaces. This port is typically proxied by a web server like Nginx.
+        *   `--workers 4`: Example number of worker processes (adjust based on your server's CPU cores).
+        *   `--bind 0.0.0.0:5000`: Specifies the host and port. This port is typically proxied by a web server like Nginx.
+
+*   **Setting Environment Variables on Windows:**
+    *   You can set environment variables persistently through:
+        *   System Properties -> Advanced -> Environment Variables...
+    *   Or for the current session in Command Prompt:
+        ```bash
+        set FLASK_CONFIG=production
+        set SECRET_KEY=your_actual_secret_key
+        ```
+    *   Or in PowerShell:
+        ```powershell
+        $env:FLASK_CONFIG="production"
+        $env:SECRET_KEY="your_actual_secret_key"
+        ```
+    *   For production, using persistent environment variables or a `.env` file loaded by your WSGI server/hosting environment is recommended.
 
 ### Frontend (Vue.js SPA)
 
@@ -137,45 +169,54 @@ This section outlines key considerations for preparing the application for a pro
 
 A common production setup involves using a web server like Nginx to serve the static frontend files and act as a reverse proxy for the backend API (Gunicorn).
 
-*   **Nginx Configuration Snippet (Illustrative):**
-    ```nginx
-    # /etc/nginx/sites-available/your_xuetong_site.conf
-    server {
-        listen 80; # Or 443 for HTTPS with SSL configuration
-        server_name yourdomain.com; # Replace with your actual domain
+*   **Nginx (Linux/macOS):**
+    *   Nginx is a common choice for serving static files and as a reverse proxy.
+    *   Configuration Snippet (Illustrative):
+        ```nginx
+        # /etc/nginx/sites-available/your_xuetong_site.conf
+        server {
+            listen 80; # Or 443 for HTTPS
+            server_name yourdomain.com;
 
-        # Vue.js frontend static files (from frontend/dist/)
-        location / {
-            root /var/www/xuetong_system/frontend/dist; # Adjust path to your deployment
-            try_files $uri $uri/ /index.html;
-            # Add caching headers, security headers, etc.
+            location / {
+                root /var/www/xuetong_system/frontend/dist; # Path to Vue.js build
+                try_files $uri $uri/ /index.html;
+            }
+
+            location /api/ { # Matches VITE_API_BASE_URL="/api"
+                proxy_pass http://127.0.0.1:5000; # Backend WSGI server
+                proxy_set_header Host $host;
+                proxy_set_header X-Real-IP $remote_addr;
+                proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                proxy_set_header X-Forwarded-Proto $scheme;
+            }
+            # Add SSL configuration for HTTPS
         }
-
-        # Reverse proxy API requests to the backend Flask/Gunicorn server
-        # This path must match the VITE_API_BASE_URL if it's a relative path (e.g., /api)
-        location /api/ {
-            # If VITE_API_BASE_URL in frontend is just '/',
-            # then proxy all non-static locations:
-            # location ~ ^/(auth|courses|assignments|exams|discussions|progress|admin)/ { ... }
-
-            proxy_pass http://127.0.0.1:5000; # Gunicorn running on port 5000
-            proxy_set_header Host $host;
-            proxy_set_header X-Real-IP $remote_addr;
-            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-            proxy_set_header X-Forwarded-Proto $scheme;
-            # Optional: Increase client body size if handling large file uploads via API
-            # client_max_body_size 20M;
-        }
-
-        # SSL Configuration (Highly Recommended for Production)
-        # listen 443 ssl;
-        # ssl_certificate /path/to/your/fullchain.pem;
-        # ssl_certificate_key /path/to/your/privkey.pem;
-        # include /etc/letsencrypt/options-ssl-nginx.conf; # Example for Let's Encrypt
-        # ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem;   # Example for Let's Encrypt
-    }
-    ```
-*   **Important:** This Nginx example is conceptual. A production setup requires careful configuration, including SSL/TLS for HTTPS, security headers, logging, and performance tuning.
+        ```
+*   **IIS (Windows - Conceptual):**
+    *   For Windows environments, IIS can serve the frontend and proxy to Waitress.
+    *   **Serve Frontend:** Create a site in IIS pointing to `frontend/dist`. Use the URL Rewrite module with a `web.config` in `frontend/dist` to handle SPA routing:
+        ```xml
+        <?xml version="1.0" encoding="UTF-8"?>
+        <configuration>
+          <system.webServer>
+            <rewrite>
+              <rules>
+                <rule name="Handle History Mode" stopProcessing="true">
+                  <match url=".*" />
+                  <conditions logicalGrouping="MatchAll">
+                    <add input="{REQUEST_FILENAME}" matchType="IsFile" negate="true" />
+                    <add input="{REQUEST_FILENAME}" matchType="IsDirectory" negate="true" />
+                  </conditions>
+                  <action type="Rewrite" url="/" />
+                </rule>
+              </rules>
+            </rewrite>
+          </system.webServer>
+        </configuration>
+        ```
+    *   **Reverse Proxy API (using ARR):** Install Application Request Routing (ARR) for IIS. Enable proxy functionality. Create a URL Rewrite rule for your site to forward API requests (e.g., matching pattern `^api/(.*)`) to where Waitress is running (e.g., `http://localhost:5000/{R:1}`).
+*   **Important:** These examples are conceptual. Production setups require careful configuration for security, performance, and reliability (SSL/TLS, logging, etc.).
 
 ## API Endpoints Overview
 
@@ -365,7 +406,7 @@ You can also test endpoints using tools like Postman or `curl`.
 *   **Data Validation:** `email-validator` (for email format validation in models/logic, if used beyond WTForms)
 *   **CLI:** Click (Flask's default CLI library)
 *   **WSGI Server (Flask dev server):** Werkzeug
-*   **Production WSGI Server:** Gunicorn
+*   **Production WSGI Server:** Waitress (Windows), Gunicorn (Linux/macOS)
 
 ---
 This README provides guidance for setting up, running, and interacting with the XueTong System API backend.
